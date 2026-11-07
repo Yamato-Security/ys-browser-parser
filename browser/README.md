@@ -54,7 +54,17 @@ for problem in &history.problems {
 - Firefox's disk cache: version 1's block files (`read_firefox_cache1`, records found block by block, evicted ones too) and version 2's entry files (`read_firefox_cache2`): the key and URL, fetch count, when it was last fetched and modified and expires (never as a sentinel), frecency, sizes, and the metadata elements (request method, response headers, …).
 - `detect` tells these by their contents (Safari's cookies, Java index files, a Chromium cache's `index`, Opera's files) or names (Firefox's cache files).
 
-- `read_form_history`: a form history whole, as `read` does history: the entries, the deleted entries the database and its write-ahead log still hold (`deleted`, each with its `Provenance`; an earlier version of a live entry, same field and value, is not one), and Firefox's record of removed entries (`moz_deleted_formhistory`: the GUID and when), whose GUID a recovered entry carries too. `detect` tells `formhistory.sqlite` by its tables or name (`Kind::Autofill`, as `Web Data`).
+- `read_form_history`: a form history whole, as `read` does history: the entries, the deleted entries the database and its write-ahead log still hold (`deleted`, each with its `Provenance`; older versions of a live GUID are excluded; tombstones distinguish removed Firefox GUIDs even when the same value is entered again), and Firefox's record of removed entries (`moz_deleted_formhistory`: the GUID and when), whose GUID a recovered entry carries too. `detect` tells `formhistory.sqlite` by its tables or name (`Kind::Autofill`, as `Web Data`).
+
+### Form history interpretation
+
+Firefox's current implementation normally populates `moz_deleted_formhistory` only on Android.
+An empty removal table on desktop does not prove that no form history was deleted. The reader
+parses tombstones when present; it does not synthesize them. Source labels are read as stored
+and do not establish the website where a value was entered. Sources for deleted entries are
+not reconstructed. Without a matching tombstone, old copies with the same field and value
+remain conservatively suppressed, including GUID-only renames.
+See [Mozilla's form-history implementation](https://github.com/mozilla-firefox/firefox/blob/main/toolkit/components/satchel/FormHistory.sys.mjs).
 
 ## Not yet
 

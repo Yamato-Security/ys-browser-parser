@@ -3,6 +3,8 @@
 # (documentation domains, RFC 2606). The tables are Firefox 140's, as its
 # toolkit/components/satchel creates them (schema version 5).
 #
+# Removal rows here are synthesized: normal Firefox builds populate them only on Android.
+#
 # - formhistory.sqlite: four entries (one with a fraction of a millisecond in
 #   its times, two with sources: the search bar's engine names), and one entry
 #   deleted with secure_delete off, so that its record stays in the page's
@@ -90,3 +92,34 @@ INSERT INTO moz_formhistory VALUES
 INSERT INTO moz_deleted_formhistory (timeDeleted, guid) VALUES ($t0+30000000,'GuIdOlD000000003');
 SQL
 cp old/formhistory.sqlite "$here/old/formhistory.sqlite"
+
+# Repeated removals/re-entry, an edited live GUID and an in-place GUID rename.
+# Tombstones are explicitly synthesized (normally populated only on Android).
+mkdir lifecycle
+mkdir -p "$here/lifecycle"
+sqlite3 lifecycle/formhistory.sqlite <<SQL
+PRAGMA journal_mode = WAL;
+PRAGMA wal_autocheckpoint = 0;
+$tables
+INSERT INTO moz_formhistory VALUES
+ (1,'searchbar-history','incident response',1,$t0,$t0+1000000,'CycleGuidA000001'),
+ (2,'email','before@example.test',1,$t0,$t0+1000000,'StableGuid000001'),
+ (3,'q','rename-only',1,$t0,$t0+1000000,'RenameGuid000001'),
+ (6,'legacy-guid','unchanged',1,$t0,$t0+1000000,NULL);
+PRAGMA wal_checkpoint(TRUNCATE);
+PRAGMA secure_delete = ON;
+BEGIN;
+DELETE FROM moz_formhistory WHERE id = 1;
+INSERT INTO moz_deleted_formhistory (timeDeleted,guid) VALUES ($t0+30000000,'CycleGuidA000001');
+INSERT INTO moz_formhistory VALUES (4,'searchbar-history','incident response',1,$t0+30000000,$t0+40000000,'CycleGuidB000002');
+COMMIT;
+BEGIN;
+DELETE FROM moz_formhistory WHERE id = 4;
+INSERT INTO moz_deleted_formhistory (timeDeleted,guid) VALUES ($t0+50000000,'CycleGuidB000002');
+INSERT INTO moz_formhistory VALUES (5,'searchbar-history','incident response',1,$t0+50000000,$t0+60000000,'CycleGuidC000003');
+UPDATE moz_formhistory SET value='after@example.test', timesUsed=2, lastUsed=$t0+60000000 WHERE id=2;
+UPDATE moz_formhistory SET guid='RenamedGuid00002' WHERE id=3;
+UPDATE moz_formhistory SET guid='KnownGuid0000006' WHERE id=6;
+COMMIT;
+.shell cp lifecycle/formhistory.sqlite "$here/lifecycle/formhistory.sqlite" && cp lifecycle/formhistory.sqlite-wal "$here/lifecycle/formhistory.sqlite-wal"
+SQL

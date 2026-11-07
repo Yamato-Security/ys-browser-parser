@@ -193,3 +193,70 @@ fn other_databases_are_not_form_history() {
     assert!(read_form_history(&fixture("plaso/History"), &[]).is_err());
     assert!(read_form_history(b"not a database", &[]).is_err());
 }
+
+fn lifecycle() -> browser::FormHistory {
+    read_form_history(
+        &fixture("formhistory/lifecycle/formhistory.sqlite"),
+        &fixture("formhistory/lifecycle/formhistory.sqlite-wal"),
+    )
+    .unwrap()
+}
+
+#[test]
+fn tombstones_keep_distinct_deleted_entries_when_the_value_is_reentered() {
+    let history = lifecycle();
+    assert!(history.problems.is_empty(), "{:?}", history.problems);
+    let live = find(&history.entries, "searchbar-history", "incident response");
+    assert_eq!(live.guid.as_deref(), Some("CycleGuidC000003"));
+    let mut guids: Vec<_> = history
+        .deleted
+        .iter()
+        .filter(|r| r.entry.field == "searchbar-history" && r.entry.value == "incident response")
+        .filter_map(|r| r.entry.guid.as_deref())
+        .collect();
+    guids.sort_unstable();
+    assert_eq!(guids, ["CycleGuidA000001", "CycleGuidB000002"]);
+    assert_eq!(history.removals.len(), 2);
+    for entry in &history.deleted {
+        assert!(
+            history
+                .removals
+                .iter()
+                .any(|r| Some(r.guid.as_str()) == entry.entry.guid.as_deref())
+        );
+    }
+}
+
+#[test]
+fn updating_a_live_guids_value_is_not_a_deletion() {
+    let history = lifecycle();
+    let current = find(&history.entries, "email", "after@example.test");
+    assert_eq!(current.guid.as_deref(), Some("StableGuid000001"));
+    assert!(
+        !history
+            .deleted
+            .iter()
+            .any(|r| r.entry.guid.as_deref() == Some("StableGuid000001"))
+    );
+}
+
+#[test]
+fn renamed_and_previously_unknown_guids_are_not_false_deletions() {
+    let history = lifecycle();
+    assert_eq!(
+        find(&history.entries, "q", "rename-only").guid.as_deref(),
+        Some("RenamedGuid00002")
+    );
+    assert_eq!(
+        find(&history.entries, "legacy-guid", "unchanged")
+            .guid
+            .as_deref(),
+        Some("KnownGuid0000006")
+    );
+    assert!(
+        !history
+            .deleted
+            .iter()
+            .any(|r| r.entry.field == "q" || r.entry.field == "legacy-guid")
+    );
+}

@@ -24,7 +24,7 @@ use proptest::prelude::*;
 
 /// Every kind, from the oldest version to the newest, and databases with
 /// deleted records to recover.
-const DATABASES: [&str; 24] = [
+const DATABASES: [&str; 25] = [
     "plaso/History",
     "plaso/History-59.0.3071.86",
     "plaso/places.sqlite",
@@ -38,6 +38,7 @@ const DATABASES: [&str; 24] = [
     "recovery/places.sqlite",
     "formhistory/formhistory.sqlite",
     "formhistory/old/formhistory.sqlite",
+    "formhistory/lifecycle/formhistory.sqlite",
     "plaso/Cookies.binarycookies",
     "plaso/load_statistics.db.gz",
     "plaso/cookies.db.gz",
@@ -53,13 +54,17 @@ const DATABASES: [&str; 24] = [
 
 /// Databases with their logs: a visit only in the log; deletions only in
 /// the log, whose older page versions are recovered from.
-const LOGGED: [(&str, &str); 4] = [
+const LOGGED: [(&str, &str); 5] = [
     ("synthetic/wal/History", "synthetic/wal/History-wal"),
     ("recovery/History", "recovery/History-wal"),
     ("recovery/places.sqlite", "recovery/places.sqlite-wal"),
     (
         "formhistory/wal/formhistory.sqlite",
         "formhistory/wal/formhistory.sqlite-wal",
+    ),
+    (
+        "formhistory/lifecycle/formhistory.sqlite",
+        "formhistory/lifecycle/formhistory.sqlite-wal",
     ),
 ];
 

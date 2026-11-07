@@ -63,13 +63,16 @@ pub struct AutofillEntry {
     /// [`FormRemoval`]s name it.
     pub guid: Option<String>,
     /// Firefox: where the entry was saved from (`moz_sources`, in the
-    /// versions that have it), as stored.
+    /// versions that have it), as stored. These labels need not be website
+    /// URLs. Sources of deleted entries are not reconstructed.
     pub sources: Vec<String>,
 }
 
 /// Firefox's record of a removed form history entry
 /// (`moz_deleted_formhistory`): which entry, by GUID, and when. The entry
 /// itself is gone; [`FormHistory::deleted`] may still hold it.
+/// Firefox normally writes these tombstones on Android only. An empty
+/// table on desktop does not establish that no entries were removed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormRemoval {
     /// The row id.
@@ -99,7 +102,9 @@ pub struct FormHistory {
     /// The entries, in row order.
     pub entries: Vec<AutofillEntry>,
     /// Deleted entries the database and its log still hold: not live, and
-    /// not an earlier version of a live entry (same field and value).
+    /// not an earlier version of a live GUID. Otherwise field and value
+    /// identify old copies, except when Firefox's tombstones identify
+    /// distinct removed GUIDs for a value that was entered again.
     pub deleted: Vec<RecoveredFormEntry>,
     /// Firefox: the removals it recorded.
     pub removals: Vec<FormRemoval>,
@@ -147,15 +152,36 @@ pub(crate) fn history(
         FormStore::Chromium => (CHROMIUM, chromium_entry),
         FormStore::Firefox => (FIREFOX, firefox_entry),
     };
-    let live: HashSet<(String, String)> = entries.iter().filter_map(key).collect();
-    let deleted = recovered::deleted(recovery.read(db, table, convert), key, &live, rank)
-        .into_iter()
-        .map(|Found { entry, provenance }| RecoveredFormEntry { entry, provenance })
-        .collect();
     let removals = match store {
         FormStore::Firefox => table::read(db, "moz_deleted_formhistory", &mut problems, removal),
         FormStore::Chromium => Vec::new(),
     };
+    let live: HashSet<FormKey> = entries.iter().filter_map(key).collect();
+    let live_guids: HashSet<&str> = entries.iter().filter_map(guid).collect();
+    let removed_guids: HashSet<&str> = removals
+        .iter()
+        .map(|r| r.guid.as_str())
+        .filter(|guid| !guid.is_empty())
+        .collect();
+    let found = recovery
+        .read(db, table, convert)
+        .into_iter()
+        // A value or field may change without deleting the identified entry.
+        .filter(|found| !guid(&found.entry).is_some_and(|id| live_guids.contains(id)))
+        .collect();
+    let deleted_key = |entry: &AutofillEntry| {
+        match guid(entry).filter(|id| removed_guids.contains(id)) {
+            Some(id) => Some(FormKey::RemovedGuid(id.to_owned())),
+            // Firefox also supports changing a GUID in place. A different
+            // GUID alone is not proof of deletion; keep the conservative
+            // field/value rule unless a tombstone establishes removal.
+            None => key(entry),
+        }
+    };
+    let deleted = recovered::deleted(found, deleted_key, &live, rank)
+        .into_iter()
+        .map(|Found { entry, provenance }| RecoveredFormEntry { entry, provenance })
+        .collect();
     FormHistory {
         store,
         entries,
@@ -165,10 +191,22 @@ pub(crate) fn history(
     }
 }
 
-/// What identifies an entry: both browsers keep one row per field and value.
-fn key(entry: &AutofillEntry) -> Option<(String, String)> {
+/// The ordinary identity, or a separate Firefox entry proven removed by GUID.
+#[derive(Hash, PartialEq, Eq)]
+enum FormKey {
+    FieldValue(String, String),
+    RemovedGuid(String),
+}
+
+/// A nonempty Firefox identifier; empty or lost values cannot establish identity.
+fn guid(entry: &AutofillEntry) -> Option<&str> {
+    entry.guid.as_deref().filter(|id| !id.is_empty())
+}
+
+/// Both browsers ordinarily keep one row per field and value.
+fn key(entry: &AutofillEntry) -> Option<FormKey> {
     (!entry.field.is_empty() && !entry.value.is_empty())
-        .then(|| (entry.field.clone(), entry.value.clone()))
+        .then(|| FormKey::FieldValue(entry.field.clone(), entry.value.clone()))
 }
 
 /// Of several copies of one deleted entry: the best recovered, then the
