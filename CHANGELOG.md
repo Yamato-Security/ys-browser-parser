@@ -6,6 +6,18 @@ First version of Yamato Security's fork, of three crates: sootmark-browser 0.7.0
 b2a6f96), sootmark-sqlite 0.2.0 (Sootmark/sqlite a42d881) and sootmark-plist 0.1.0 (Sootmark/plist
 854c8f4). (@YamatoSecurity)
 
+### Fixed
+- When a WAL's committed page 1 is invalid or disagrees with its page size, discard its
+  header along with the WAL and retain the readable database file. A valid logged header can
+  still restore a damaged file header. (@YamatoSecurity)
+- Keep unread values in damaged SQLite rows NULL instead of substituting schema defaults.
+  Complete older rows still receive legitimate defaults for columns added later. (@YamatoSecurity)
+- Bound SQLite image-export allocations in proportion to the supplied file and WAL pages,
+  and report implausible committed sizes. Small gaps retain their original page offsets.
+  (@YamatoSecurity)
+- Use wrapping arithmetic for Safari binary-cookie page checksums; large pages no longer
+  panic when their sum exceeds 32 bits. (@YamatoSecurity)
+
 ### Changed
 - License: ys-browser-parser is copyright Shirofune Security Co., Ltd. and released under the
   Reciprocal Public License 1.5 (RPL-1.5). Upstream's code stays under MIT OR Apache-2.0

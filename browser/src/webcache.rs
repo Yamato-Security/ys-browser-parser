@@ -16,7 +16,7 @@
 // and limitations under the RPL.
 
 //! Internet Explorer and legacy Edge's `WebCacheV01.dat`, an ESE database
-//! read with `sootmark-ese`. Its `Containers` table lists the caches; the
+//! read with `ys-srum-parser-ese`. Its `Containers` table lists the caches; the
 //! history ones (`History`, and `MSHist01…` for each day or week) keep one
 //! row per page in `Container_<ContainerId>`, its `Url` written
 //! `Visited: alice@https://…` (or `:2014051220140513: alice@…` in the

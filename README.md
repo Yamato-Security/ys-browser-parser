@@ -93,6 +93,8 @@ What the fork changes:
 | `WebCacheV01.dat` read with ys-srum-parser's ESE reader instead of sootmark-ese | fork |
 | One workspace and one CI (Linux, macOS, Windows, MSRV, wasm32, cargo-deny, the license notice), actions pinned by commit | fork |
 | Code changed for Rust 1.99's lints (`as_chunks`, `is_multiple_of`, `let` chains) and the 2024 style edition, with the same behaviour (all upstream tests pass) | fork |
+| Safari binary-cookie page checksums wrap correctly for large pages instead of panicking | fork |
+| SQLite hardening: rejected WAL headers cannot affect the file fallback, damaged values stay NULL, and image exports cannot expand tiny logs into huge allocations | fork |
 
 ## Licence
 

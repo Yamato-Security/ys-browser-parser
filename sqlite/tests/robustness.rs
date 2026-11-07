@@ -288,3 +288,32 @@ mod properties {
         }
     }
 }
+
+/// Damage is distinct from a complete record written before ALTER TABLE.
+#[test]
+fn damaged_values_do_not_turn_into_schema_defaults() {
+    let mut file = support::fixture("damaged-defaults.db");
+    let before = Database::open(&file).unwrap();
+    let root = (before.table("evidence").unwrap().root_page as usize - 1) * PAGE_SIZE;
+    assert_eq!(file[root], 0x0d); // a leaf holding the two short rows
+    let cell = root + usize::from(u16::from_be_bytes([file[root + 8], file[root + 9]]));
+    assert!(file[cell] < 128); // a one-byte payload length
+    assert_eq!(file[cell + 1], 1); // a one-byte rowid
+    let payload = cell + 2;
+    assert_eq!(file[payload], 4); // three serial types, one-byte header size
+    // Claim more bytes for status than the record contains. URL still survives.
+    file[payload + 3] = 127;
+    let db = Database::open(&file).unwrap();
+    let mut rows = db.rows("evidence").unwrap();
+    let damaged = rows.next().unwrap();
+    assert_eq!(
+        damaged.values[1],
+        sqlite::Value::Text("https://example.test/one".into())
+    );
+    assert_eq!(damaged.values[2], sqlite::Value::Null);
+    assert!(rows.problems().iter().any(|p| p.contains("cut off")));
+    // The intact row has its actual status and its legitimate ALTER TABLE default.
+    let intact = rows.next().unwrap();
+    assert_eq!(intact.values[2], sqlite::Value::Text("observed-two".into()));
+    assert_eq!(intact.values[3], sqlite::Value::Text("added-later".into()));
+}

@@ -34,7 +34,8 @@ pub struct Row {
     /// One value per column, in declared order (an `INTEGER PRIMARY KEY`
     /// column holds the rowid). Values the record holds beyond the declared
     /// columns follow them, and are reported. When the table's statement
-    /// couldn't be read, the record's values as stored.
+    /// couldn't be read, the record's values as stored. Unread values in a
+    /// damaged record are NULL, never filled from schema defaults.
     pub values: Vec<Value>,
 }
 
@@ -83,6 +84,7 @@ impl<'a> Rows<'a> {
     fn row(&mut self, entry: &Entry) -> (Row, usize) {
         let rowid = entry.rowid.unwrap_or_default();
         let (stored, problem) = record::decode(&entry.payload, self.encoding);
+        let complete = problem.is_none();
         let stored_count = stored.len();
         if let Some(problem) = problem {
             self.cursor
@@ -92,7 +94,7 @@ impl<'a> Rows<'a> {
         let values = if self.columns.is_empty() {
             stored
         } else {
-            self.by_column(stored, rowid, entry.page)
+            self.by_column(stored, rowid, entry.page, complete)
         };
         let row = Row {
             rowid,
@@ -104,8 +106,15 @@ impl<'a> Rows<'a> {
 
     /// The stored values placed in their columns: virtual generated columns
     /// aren't stored, columns added after the row was written take their
-    /// default, the rowid alias takes the rowid.
-    fn by_column(&mut self, stored: Vec<Value>, rowid: i64, page: u32) -> Vec<Value> {
+    /// default, the rowid alias takes the rowid. Damage does not establish
+    /// that a column was added later: unread values remain NULL.
+    fn by_column(
+        &mut self,
+        stored: Vec<Value>,
+        rowid: i64,
+        page: u32,
+        complete: bool,
+    ) -> Vec<Value> {
         let mut stored = stored.into_iter();
         let mut values: Vec<Value> = self
             .columns
@@ -114,7 +123,13 @@ impl<'a> Rows<'a> {
                 let value = if column.generated == Some(Generated::Virtual) {
                     Value::Null
                 } else {
-                    stored.next().unwrap_or_else(|| column.default.clone())
+                    stored.next().unwrap_or_else(|| {
+                        if complete {
+                            column.default.clone()
+                        } else {
+                            Value::Null
+                        }
+                    })
                 };
                 if column.rowid_alias {
                     Value::Integer(rowid)

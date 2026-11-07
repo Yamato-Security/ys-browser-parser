@@ -20,6 +20,9 @@
 
 use std::collections::HashMap;
 
+/// Allow small gaps while keeping a damaged export proportional to its input.
+pub(crate) const MAX_IMAGE_PAGE_EXPANSION: u32 = 2;
+
 /// The database's pages, borrowed from the file and the log.
 pub(crate) struct Pages<'a> {
     file: &'a [u8],
@@ -82,12 +85,15 @@ impl<'a> Pages<'a> {
 
     /// Every page, whole, in order: from the log when it committed one,
     /// else from the file; zeros for a page neither holds (a truncated
-    /// file). No more pages than the file and the log hold, whatever a
-    /// damaged header or commit frame claims.
+    /// file). The export's size stays proportional to the supplied pages,
+    /// whatever a damaged header or commit frame claims.
     pub(crate) fn image(&self) -> Vec<u8> {
         let in_file = u32::try_from(self.file.len() / self.page_size).unwrap_or(u32::MAX);
         let last_logged = self.wal.keys().copied().max().unwrap_or(0);
-        let count = self.count.min(in_file.max(last_logged));
+        let logged_pages = u32::try_from(self.wal.len()).unwrap_or(u32::MAX);
+        let available = in_file.saturating_add(logged_pages);
+        let limit = available.saturating_mul(MAX_IMAGE_PAGE_EXPANSION);
+        let count = self.count.min(in_file.max(last_logged)).min(limit);
         let mut image = Vec::with_capacity(count as usize * self.page_size);
         for number in 1..=count {
             match self

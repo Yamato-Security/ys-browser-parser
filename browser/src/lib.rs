@@ -405,7 +405,7 @@ pub struct Page {
     pub frecency: Option<i64>,
 }
 
-/// Where and how a deleted entry was found: the record `sootmark-sqlite`
+/// Where and how a deleted entry was found: the record `ys-browser-parser-sqlite`
 /// recovered it from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Provenance {

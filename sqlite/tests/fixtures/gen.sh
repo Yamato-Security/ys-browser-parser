@@ -234,3 +234,12 @@ cp "$here/wal.db" with-wal.db && cp "$here/wal.db-wal" with-wal.db-wal
 write_oracle wal.db "$work/with-wal.db"
 cp "$here/wal.db" file-only.db
 write_oracle wal.db-file-only "$work/file-only.db"
+
+# Complete old records use ALTER TABLE defaults; damaged records must not invent values.
+create damaged-defaults.db <<'SQL'
+PRAGMA page_size = 512;
+CREATE TABLE evidence (id INTEGER PRIMARY KEY, url TEXT, status TEXT DEFAULT 'default-not-evidence');
+INSERT INTO evidence VALUES (1, 'https://example.test/one', 'observed-one');
+INSERT INTO evidence VALUES (2, 'https://example.test/two', 'observed-two');
+ALTER TABLE evidence ADD COLUMN added TEXT DEFAULT 'added-later';
+SQL

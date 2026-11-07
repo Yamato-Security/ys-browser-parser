@@ -217,3 +217,100 @@ fn put_checksum(field: &mut [u8], (s0, s1): (u32, u32)) {
     field[..4].copy_from_slice(&s0.to_be_bytes());
     field[4..].copy_from_slice(&s1.to_be_bytes());
 }
+
+/// A checksum-valid test log, made independently of the parser.
+fn test_log(frames: &[(u32, u32, &[u8])]) -> Vec<u8> {
+    let mut log = vec![0; WAL_HEADER_SIZE];
+    log[..4].copy_from_slice(&0x377f_0683u32.to_be_bytes());
+    log[4..8].copy_from_slice(&3_007_000u32.to_be_bytes());
+    log[8..12].copy_from_slice(&(PAGE_SIZE as u32).to_be_bytes());
+    log[16..20].copy_from_slice(&1u32.to_be_bytes());
+    log[20..24].copy_from_slice(&2u32.to_be_bytes());
+    let mut sums = checksum((0, 0), &log[..24]);
+    put_checksum(&mut log[24..32], sums);
+    for &(number, commit, page) in frames {
+        assert_eq!(page.len(), PAGE_SIZE);
+        let mut frame = vec![0; FRAME_HEADER_SIZE];
+        frame[..4].copy_from_slice(&number.to_be_bytes());
+        frame[4..8].copy_from_slice(&commit.to_be_bytes());
+        frame[8..16].copy_from_slice(&log[16..24]);
+        sums = checksum(checksum(sums, &frame[..8]), page);
+        put_checksum(&mut frame[16..24], sums);
+        log.extend(frame);
+        log.extend_from_slice(page);
+    }
+    log
+}
+
+#[test]
+fn rejected_wal_page_one_does_not_replace_the_file_header() {
+    let (file, _) = files();
+    let before = Database::open(&file).unwrap();
+    let mut page = file[..PAGE_SIZE].to_vec();
+    page[16..18].copy_from_slice(&1024u16.to_be_bytes());
+    let log = test_log(&[(1, before.page_count, &page)]);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    assert!(db.wal.is_none());
+    assert_eq!(db.header, before.header);
+    assert_eq!(db.schema, before.schema);
+    assert_eq!(notes(&db), notes(&before));
+    assert!(db.problems.iter().any(|p| p.starts_with("WAL ignored:")));
+}
+
+#[test]
+fn invalid_wal_page_one_keeps_a_readable_file() {
+    let (file, _) = files();
+    let before = Database::open(&file).unwrap();
+    let page = [0; PAGE_SIZE];
+    let log = test_log(&[(1, before.page_count, &page)]);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    assert!(db.wal.is_none());
+    assert_eq!(db.header, before.header);
+    assert_eq!(notes(&db), notes(&before));
+    assert!(db.problems.iter().any(|p| p.starts_with("WAL ignored:")));
+}
+
+#[test]
+fn valid_wal_page_one_can_restore_a_damaged_file_header() {
+    let (mut file, _) = files();
+    let before = Database::open(&file).unwrap();
+    let page = file[..PAGE_SIZE].to_vec();
+    let log = test_log(&[(1, before.page_count, &page)]);
+    let expected = notes(&before);
+    file[..16].fill(0);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    assert!(db.wal.is_some());
+    assert_eq!(notes(&db), expected);
+}
+
+#[test]
+fn a_far_wal_page_does_not_allocate_a_huge_image() {
+    let (file, _) = files();
+    let page = [0; PAGE_SIZE];
+    // Only 536 log bytes, but a 32 MiB logical address. Larger numbers must
+    // not request terabytes of memory from a small evidence file.
+    let log = test_log(&[(65_536, 65_536, &page)]);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    let image = db.image();
+    assert!(
+        image.len() <= 2 * (file.len() + PAGE_SIZE),
+        "{} bytes",
+        image.len()
+    );
+    assert!(db.problems.iter().any(|p| p.contains("available pages")));
+    assert_eq!(notes(&db), notes(&Database::open(&file).unwrap()));
+}
+
+#[test]
+fn small_gaps_still_export_pages_at_their_original_offsets() {
+    let (file, _) = files();
+    let number = (file.len() / PAGE_SIZE) as u32 + 2;
+    let page = [0xa5; PAGE_SIZE];
+    let log = test_log(&[(number, number, &page)]);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    let image = db.image();
+    assert_eq!(image.len(), number as usize * PAGE_SIZE);
+    assert_eq!(&image[file.len()..file.len() + PAGE_SIZE], &[0; PAGE_SIZE]);
+    assert_eq!(&image[image.len() - PAGE_SIZE..], &page);
+    assert!(db.problems.is_empty(), "{:?}", db.problems);
+}

@@ -96,7 +96,7 @@ pub use rows::{IndexEntries, IndexEntry, Row, Rows};
 pub use schema::{Affinity, Column, Generated, SchemaEntry, Table, TableKind};
 pub use wal::WalSummary;
 
-use pager::Pages;
+use pager::{MAX_IMAGE_PAGE_EXPANSION, Pages};
 use wal::{LogFrame, Wal};
 
 /// This crate's version, for records of what parsed them.
@@ -198,16 +198,33 @@ impl<'a> Database<'a> {
             .as_ref()
             .and_then(|wal| wal.pages.get(&1).copied())
             .unwrap_or(file);
-        let header = Header::parse(page_one, &mut problems)?;
-        if let Some(log) = wal.as_ref()
-            && log.summary.page_size != header.page_size
-        {
-            problems.push(format!(
-                "WAL ignored: its page size {} is not the database's {}",
-                log.summary.page_size, header.page_size
-            ));
-            wal = None;
-        }
+        // A rejected log must not supply the file's header or its warnings.
+        // A valid logged page 1 may still restore an unreadable file header.
+        let mut header_problems = Vec::new();
+        let candidate = Header::parse(page_one, &mut header_problems);
+        let header = if let Some(log) = wal.as_ref() {
+            match candidate {
+                Ok(header) if log.summary.page_size == header.page_size => {
+                    problems.extend(header_problems);
+                    header
+                }
+                other => {
+                    let reason = match other {
+                        Ok(header) => format!(
+                            "its page size {} is not the database's {}",
+                            log.summary.page_size, header.page_size
+                        ),
+                        Err(error) => format!("unusable database header: {error}"),
+                    };
+                    problems.push(format!("WAL ignored: {reason}"));
+                    wal = None;
+                    Header::parse(file, &mut problems)?
+                }
+            }
+        } else {
+            problems.extend(header_problems);
+            candidate?
+        };
         Ok(Self::assemble(file, header, wal, problems))
     }
 
@@ -256,7 +273,9 @@ impl<'a> Database<'a> {
     /// The database as one file, as it reads: the log's committed pages in
     /// place of the file's, what SQLite would write if it checkpointed the
     /// log. For tools that take one file; [`Database::open`] reads it back
-    /// the same.
+    /// the same when the input is intact. With missing pages, the output is
+    /// bounded in proportion to the supplied pages; corrupt page numbers
+    /// cannot force a large zero-filled allocation. See [`Database::problems`].
     #[must_use]
     pub fn image(&self) -> Vec<u8> {
         self.pages.image()
@@ -333,6 +352,14 @@ fn page_count(
         .map(|wal| wal.summary.database_pages)
         .filter(|&pages| pages > 0)
     {
+        let logged_pages = wal.map_or(0, |wal| u32::try_from(wal.pages.len()).unwrap_or(u32::MAX));
+        let available = whole_pages.saturating_add(logged_pages);
+        let limit = available.saturating_mul(MAX_IMAGE_PAGE_EXPANSION);
+        if committed > limit {
+            problems.push(format!(
+                "WAL counts {committed} pages with only {available} available pages; image export is bounded to {limit} pages"
+            ));
+        }
         return committed;
     }
     match header.valid_page_count() {
