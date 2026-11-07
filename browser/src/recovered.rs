@@ -114,7 +114,7 @@ fn provenance(table: &str, columns: &[String], record: &RecoveredRecord) -> Prov
 
 /// How much of a record survived: its confidence, then its evidence, then
 /// the fewer values lost.
-fn strength(provenance: &Provenance) -> (Confidence, u8, Reverse<usize>) {
+pub(crate) fn strength(provenance: &Provenance) -> (Confidence, u8, Reverse<usize>) {
     let evidence = match provenance.evidence {
         Evidence::CellPointer => 3,
         Evidence::Cell => 2,
@@ -131,7 +131,7 @@ fn strength(provenance: &Provenance) -> (Confidence, u8, Reverse<usize>) {
 /// The entries whose key no live entry has, each key once: of those with
 /// the same key, the one ranked highest, where the first was met. Entries
 /// without a key are kept.
-fn deleted<T, K: Hash + Eq, R: Ord>(
+pub(crate) fn deleted<T, K: Hash + Eq, R: Ord>(
     found: Vec<Found<T>>,
     key: impl Fn(&T) -> Option<K>,
     live: &HashSet<K>,

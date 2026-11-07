@@ -6,7 +6,18 @@ First version of Yamato Security's fork, of three crates: sootmark-browser 0.7.0
 b2a6f96), sootmark-sqlite 0.2.0 (Sootmark/sqlite a42d881) and sootmark-plist 0.1.0 (Sootmark/plist
 854c8f4). (@YamatoSecurity)
 
+### Added
+- Firefox's form history (`formhistory.sqlite`): `read_autofill` reads its entries too, with
+  their GUID and sources (`AutofillEntry::guid`, `sources`, and `store`: `FormStore::Chromium` or
+  `Firefox`), and `detect` knows it. `read_form_history` reads a form history whole, Chromium's or
+  Firefox's: the entries, the deleted entries the database and its log still hold
+  (`RecoveredFormEntry`, with their provenance) and Firefox's removals (`FormRemoval`). (#2)
+  (@YamatoSecurity)
+
 ### Fixed
+- Form-history recovery keeps tombstone-confirmed deleted Firefox GUIDs separate when a value
+  is entered again, and does not mislabel an older value of a live GUID as deleted. GUID-only
+  renames and records with missing GUIDs retain conservative field/value matching. (@YamatoSecurity)
 - When a WAL's committed page 1 is invalid or disagrees with its page size, discard its
   header along with the WAL and retain the readable database file. A valid logged header can
   still restore a damaged file header. (@YamatoSecurity)

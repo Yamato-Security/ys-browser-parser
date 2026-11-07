@@ -50,7 +50,8 @@
 //!
 //! Beyond history, each with a reader of its own: cookies (Chromium,
 //! Firefox, and Safari's `Cookies.binarycookies`), with Google Analytics'
-//! decoded; Chromium's form history, extension activity and preferences;
+//! decoded; Chromium's and Firefox's form history, deleted entries recovered;
+//! Chromium's extension activity and preferences;
 //! Edge's load statistics; Opera's typed history (Opera 12 and older,
 //! whose global history [`read`] reads); Java's deployment cache index
 //! files; and the disk caches of Chromium (block files) and Firefox
@@ -78,7 +79,7 @@ mod transition;
 mod webcache;
 
 pub use analytics::GoogleAnalytics;
-pub use autofill::AutofillEntry;
+pub use autofill::{AutofillEntry, FormHistory, FormRemoval, FormStore, RecoveredFormEntry};
 pub use chromecache::{CacheStream, ChromeCache, ChromeCacheEntry};
 pub use cookies::{Cookie, CookieStore};
 pub use extensions::{
@@ -119,8 +120,9 @@ pub enum Kind {
     /// Chromium's `Cookies` (table `cookies`) or Firefox's
     /// `cookies.sqlite` (table `moz_cookies`): read with [`read_cookies`].
     Cookies,
-    /// Chromium's `Web Data` (table `autofill`): read with
-    /// [`read_autofill`].
+    /// Form history: Chromium's `Web Data` (table `autofill`) or Firefox's
+    /// `formhistory.sqlite` (table `moz_formhistory`): read with
+    /// [`read_form_history`] or [`read_autofill`].
     Autofill,
     /// Chromium's `Extension Activity` (table `activitylog_compressed`):
     /// read with [`read_extension_activity`].
@@ -177,6 +179,7 @@ impl Kind {
             ("Cookies", Self::Cookies),
             ("cookies.sqlite", Self::Cookies),
             ("Web Data", Self::Autofill),
+            ("formhistory.sqlite", Self::Autofill),
             ("Extension Activity", Self::ExtensionActivity),
             ("Preferences", Self::Preferences),
             ("Cookies.binarycookies", Self::SafariCookies),
@@ -208,7 +211,7 @@ impl Kind {
             Some(Self::LoadStatistics)
         } else if has("cookies") || has("moz_cookies") {
             Some(Self::Cookies)
-        } else if has("autofill") {
+        } else if has("autofill") || has("moz_formhistory") {
             Some(Self::Autofill)
         } else if has("activitylog_compressed") {
             Some(Self::ExtensionActivity)
@@ -744,12 +747,32 @@ pub fn read_firefox_cache2(data: &[u8]) -> Result<FirefoxCacheEntry, Error> {
     firefoxcache::read_v2(data)
 }
 
-/// Read Chromium's form history (`Web Data`).
+/// Read a form history's entries: Chromium's `Web Data` or Firefox's
+/// `formhistory.sqlite`, with its `-wal` file's committed changes. For the
+/// deleted entries and Firefox's removals too, use [`read_form_history`].
 ///
 /// # Errors
 /// When it isn't a SQLite database.
 pub fn read_autofill(database: &[u8], wal: &[u8]) -> Result<Rows<AutofillEntry>, Error> {
     rows(database, wal, autofill::read)
+}
+
+/// Read a form history whole: Chromium's `Web Data` or Firefox's
+/// `formhistory.sqlite`, with its `-wal` file's committed changes; the
+/// entries, the deleted entries the database and its log still hold (as
+/// for history), and Firefox's record of removed entries
+/// (`moz_deleted_formhistory`).
+///
+/// # Errors
+/// When it isn't a SQLite database, or holds no form history.
+pub fn read_form_history(database: &[u8], wal: &[u8]) -> Result<FormHistory, Error> {
+    let db = Database::open_with_wal(database, wal).map_err(|e| Error(e.to_string()))?;
+    if Kind::of(&db) != Some(Kind::Autofill) {
+        return Err(Error("not a form history database".to_owned()));
+    }
+    let mut problems = db.problems.clone();
+    let recovery = recovered::Recovery::new(&db, &mut problems);
+    Ok(autofill::history(&db, &recovery, problems))
 }
 
 /// Read Chromium's extension activity log (`Extension Activity`).
