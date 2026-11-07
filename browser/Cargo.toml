@@ -17,8 +17,8 @@ name = "browser"
 [dependencies]
 common = { package = "sootmark-common", version = "0.3.7" }
 ese = { package = "sootmark-ese", version = "0.1.0" }
-plist = { package = "sootmark-plist", version = "0.1.0" }
-sqlite = { package = "sootmark-sqlite", version = "0.2.0" }
+plist = { package = "sootmark-plist", path = "../plist" }
+sqlite = { package = "sootmark-sqlite", path = "../sqlite" }
 
 [dev-dependencies]
 proptest = "1"

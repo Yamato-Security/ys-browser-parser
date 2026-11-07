@@ -1,0 +1,3 @@
+[workspace]
+members = ["browser", "sqlite", "plist"]
+resolver = "2"
