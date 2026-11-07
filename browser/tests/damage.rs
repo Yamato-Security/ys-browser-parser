@@ -24,7 +24,7 @@ use proptest::prelude::*;
 
 /// Every kind, from the oldest version to the newest, and databases with
 /// deleted records to recover.
-const DATABASES: [&str; 22] = [
+const DATABASES: [&str; 24] = [
     "plaso/History",
     "plaso/History-59.0.3071.86",
     "plaso/places.sqlite",
@@ -36,6 +36,8 @@ const DATABASES: [&str; 22] = [
     "synthetic/places.sqlite",
     "recovery/chromium.db",
     "recovery/places.sqlite",
+    "formhistory/formhistory.sqlite",
+    "formhistory/old/formhistory.sqlite",
     "plaso/Cookies.binarycookies",
     "plaso/load_statistics.db.gz",
     "plaso/cookies.db.gz",
@@ -51,16 +53,21 @@ const DATABASES: [&str; 22] = [
 
 /// Databases with their logs: a visit only in the log; deletions only in
 /// the log, whose older page versions are recovered from.
-const LOGGED: [(&str, &str); 3] = [
+const LOGGED: [(&str, &str); 4] = [
     ("synthetic/wal/History", "synthetic/wal/History-wal"),
     ("recovery/History", "recovery/History-wal"),
     ("recovery/places.sqlite", "recovery/places.sqlite-wal"),
+    (
+        "formhistory/wal/formhistory.sqlite",
+        "formhistory/wal/formhistory.sqlite-wal",
+    ),
 ];
 
 fn read_everything(data: &[u8], wal: &[u8]) {
     let _ = browser::read(data, wal);
     let _ = browser::read_cookies(data, wal);
     let _ = browser::read_autofill(data, wal);
+    let _ = browser::read_form_history(data, wal);
     let _ = browser::read_extension_activity(data, wal);
     let _ = browser::read_preferences(data);
     let _ = browser::read_binary_cookies(data);
