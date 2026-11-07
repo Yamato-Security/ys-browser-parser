@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/plist (https://github.com/Sootmark/plist), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Apple property lists, read without CoreFoundation: binary
 //! (`bplist00`) and XML (`<plist version="1.0">`), every object type,
 //! dictionaries in file order, and NSKeyedArchiver archives resolved into
@@ -53,7 +70,7 @@ mod value;
 mod xml;
 
 pub use common::time::{Precision, Semantic, Ts};
-pub use keyed::{unarchive, Unarchived};
+pub use keyed::{Unarchived, unarchive};
 pub use value::Value;
 
 /// This crate's version, for records of what parsed them.

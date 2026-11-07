@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/sqlite (https://github.com/Sootmark/sqlite), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Just enough SQL to read a `CREATE TABLE` statement as SQLite stores it
 //! in the schema: the table's columns, their declared types, defaults and
 //! constraints, and its options.
@@ -317,10 +334,8 @@ fn columns(body: &[Token], without_rowid: bool) -> Option<Vec<Column>> {
             declarations[index] = PrimaryKey::Ascending;
         }
     }
-    if !without_rowid {
-        if let Some(index) = rowid_alias(&columns, &declarations) {
-            columns[index].rowid_alias = true;
-        }
+    if !without_rowid && let Some(index) = rowid_alias(&columns, &declarations) {
+        columns[index].rowid_alias = true;
     }
     Some(columns)
 }
@@ -397,14 +412,14 @@ fn type_name(tokens: &[Token]) -> (String, &[Token]) {
         .filter_map(|token| token.identifier().map(str::to_owned))
         .collect();
     let mut rest = &tokens[words..];
-    if words > 0 {
-        if let Some((size, after)) = parenthesized(rest) {
-            let size: Vec<String> = size.iter().map(token_text).collect();
-            if let Some(last) = name.last_mut() {
-                *last = format!("{last}({})", size.join(""));
-            }
-            rest = after;
+    if words > 0
+        && let Some((size, after)) = parenthesized(rest)
+    {
+        let size: Vec<String> = size.iter().map(token_text).collect();
+        if let Some(last) = name.last_mut() {
+            *last = format!("{last}({})", size.join(""));
         }
+        rest = after;
     }
     (name.join(" "), rest)
 }
@@ -499,7 +514,7 @@ fn number_value(text: &str, negative: bool) -> Value {
 }
 
 fn hex_bytes(hex: &str) -> Option<Vec<u8>> {
-    if hex.len() % 2 != 0 || !hex.is_ascii() {
+    if !hex.len().is_multiple_of(2) || !hex.is_ascii() {
         return None;
     }
     (0..hex.len())
@@ -528,8 +543,7 @@ mod tests {
 
     #[test]
     fn quoted_names_and_comments() {
-        let sql =
-            "CREATE TABLE \"t\" (\"odd \"\"name\"\"\" TEXT, [bracket col] BLOB, `tick` REAL, \
+        let sql = "CREATE TABLE \"t\" (\"odd \"\"name\"\"\" TEXT, [bracket col] BLOB, `tick` REAL, \
                    'str' -- a comment\n, /* inline */ plain)";
         assert_eq!(
             names(sql),

@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/sqlite (https://github.com/Sootmark/sqlite), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! The write-ahead log fixture (`wal.db` and `wal.db-wal`, made by
 //! `tests/fixtures/gen.sh`): a log restarted after a checkpoint, holding one
 //! committed transaction, the spilled frames of one that never committed,
@@ -40,9 +57,11 @@ fn the_log_holds_what_the_file_does_not() {
         body(&after, 25),
         Some("round two: committed to the WAL only")
     );
-    assert!(after
-        .iter()
-        .all(|row| !body(&after, row.rowid).unwrap().starts_with("round three")));
+    assert!(
+        after
+            .iter()
+            .all(|row| !body(&after, row.rowid).unwrap().starts_with("round three"))
+    );
 }
 
 #[test]
@@ -172,7 +191,7 @@ fn big_endian_copy(wal: &[u8]) -> Vec<u8> {
     let mut sums = checksum((0, 0), &big[..24]);
     put_checksum(&mut big[24..32], sums);
     let salts = big[16..24].to_vec();
-    for frame in big[WAL_HEADER_SIZE..].chunks_exact_mut(FRAME_SIZE) {
+    for frame in big[WAL_HEADER_SIZE..].as_chunks_mut::<FRAME_SIZE>().0 {
         if frame[8..16] != salts[..] {
             break;
         }
@@ -185,7 +204,7 @@ fn big_endian_copy(wal: &[u8]) -> Vec<u8> {
 /// The log checksum over big-endian words, written independently of the
 /// crate's.
 fn checksum((mut s0, mut s1): (u32, u32), bytes: &[u8]) -> (u32, u32) {
-    for pair in bytes.chunks_exact(8) {
+    for pair in bytes.as_chunks::<8>().0 {
         let x0 = u32::from_be_bytes(pair[..4].try_into().unwrap());
         let x1 = u32::from_be_bytes(pair[4..].try_into().unwrap());
         s0 = s0.wrapping_add(x0).wrapping_add(s1);

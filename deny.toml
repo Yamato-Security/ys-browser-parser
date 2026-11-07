@@ -7,8 +7,9 @@ all-features = true
 yanked = "deny"
 
 [licenses]
-# Permissive only, so every Sootmark product can use this crate.
-allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
+# Dependencies: permissive only, so any Yamato Security tool can use these crates. RPL-1.5 is
+# the crates' own license (LICENSE).
+allow = ["RPL-1.5", "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
 unused-allowed-license = "allow"
 confidence-threshold = 0.9
 
@@ -28,3 +29,5 @@ deny = [
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+# ys-srum-parser's ESE reader (Yamato Security's fork of Sootmark/ese); Cargo.lock pins the commit.
+allow-git = ["https://github.com/Yamato-Security/ys-srum-parser"]

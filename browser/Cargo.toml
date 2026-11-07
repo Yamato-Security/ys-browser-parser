@@ -1,24 +1,29 @@
 [package]
-name = "sootmark-browser"
-version = "0.7.0"
-edition = "2021"
-rust-version = "1.80"
+name = "ys-browser-parser"
+version = "1.0.0"
+authors = ["Florian Amette", "Zach Mathis (@yamatosecurity)"]
+# Yamato Security's fork of the upstream crate (https://github.com/Sootmark/browser): not published
+# under the upstream name.
+publish = false
+edition = "2024"
+rust-version = "1.99"
 description = "Browser artifacts for forensics: history and downloads (Chromium, Firefox, Safari, Opera, Internet Explorer WebCache) with deleted entries recovered, cookies (Safari's binary ones too) with Google Analytics decoded, Chromium and Firefox disk caches, form history, extensions, Edge load statistics, Java cache index files."
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/Sootmark/browser"
-homepage = "https://sootmark.com"
+license = "RPL-1.5 AND (MIT OR Apache-2.0)"
+repository = "https://github.com/Yamato-Security/ys-browser-parser"
+homepage = "https://github.com/Yamato-Security/ys-browser-parser"
 keywords = ["forensics", "dfir", "incident-response", "chrome", "firefox"]
 # Sources only: test fixtures stay in the repository.
-include = ["/src", "/README.md", "/LICENSE-APACHE", "/LICENSE-MIT"]
+include = ["/src", "/README.md", "/LICENSE", "/LICENSE-APACHE", "/LICENSE-MIT"]
 
 [lib]
 name = "browser"
 
 [dependencies]
 common = { package = "sootmark-common", version = "0.3.7" }
-ese = { package = "sootmark-ese", version = "0.1.0" }
-plist = { package = "sootmark-plist", path = "../plist" }
-sqlite = { package = "sootmark-sqlite", path = "../sqlite" }
+# The ESE reader of ys-srum-parser (Yamato Security's fork of Sootmark/ese), for WebCacheV01.dat.
+ese = { package = "ys-srum-parser-ese", git = "https://github.com/Yamato-Security/ys-srum-parser", version = "1.0" }
+plist = { package = "ys-browser-parser-plist", path = "../plist", version = "1.0" }
+sqlite = { package = "ys-browser-parser-sqlite", path = "../sqlite", version = "1.0" }
 
 [dev-dependencies]
 proptest = "1"

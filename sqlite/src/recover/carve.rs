@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/sqlite (https://github.com/Sootmark/sqlite), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Finding records in the bytes of a page: whole cells where a page points
 //! to them or where their payload size and rowid still agree with their
 //! record, and freed cells whose first bytes a freeblock header overwrote,
@@ -12,15 +29,15 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use super::fit::{infer_serial, number_sizes, Agreement, Shape, Slot, Strictness};
-use super::layout::{PageLayout, FREEBLOCK_HEADER_SIZE};
+use super::fit::{Agreement, Shape, Slot, Strictness, infer_serial, number_sizes};
+use super::layout::{FREEBLOCK_HEADER_SIZE, PageLayout};
 use super::survey::Use;
 use super::{Area, Confidence, Evidence, PageState, RecoveredRecord};
-use crate::btree::{local_size, TreeKind, PAGE_NUMBER_SIZE};
+use crate::btree::{PAGE_NUMBER_SIZE, TreeKind, local_size};
 use crate::bytes::{u32_at, varint_at};
-use crate::header::{TextEncoding, HEADER_SIZE};
+use crate::header::{HEADER_SIZE, TextEncoding};
 use crate::pager::Pages;
-use crate::record::{strict_header, SerialType, Value};
+use crate::record::{SerialType, Value, strict_header};
 
 /// The most bytes a cell's payload size and rowid varints take before its
 /// record: four for payloads under 2^28 bytes (SQLite's limit is 10^9),
@@ -43,11 +60,7 @@ pub(super) struct PageRef<'p> {
 impl PageRef<'_> {
     /// Where its b-tree header starts: after the database header on page 1.
     fn header_start(&self) -> usize {
-        if self.number == 1 {
-            HEADER_SIZE
-        } else {
-            0
-        }
+        if self.number == 1 { HEADER_SIZE } else { 0 }
     }
 }
 
@@ -338,10 +351,10 @@ impl<'s, 'a> Scanner<'s, 'a> {
     /// even when it fits no table.
     fn pointed_cell(&mut self, page: &PageRef, offset: usize) {
         let limit = page.bytes.len();
-        if let Some(layout) = self.cell_at(page, offset, limit, Evidence::CellPointer) {
-            if let Some(found) = self.resolve_cell(page, layout, limit, Area::Cell) {
-                self.found.push(found);
-            }
+        if let Some(layout) = self.cell_at(page, offset, limit, Evidence::CellPointer)
+            && let Some(found) = self.resolve_cell(page, layout, limit, Area::Cell)
+        {
+            self.found.push(found);
         }
     }
 
@@ -960,7 +973,9 @@ fn valid_text(bytes: &[u8], cut: bool, encoding: TextEncoding) -> Option<String>
         return None;
     }
     let mut units: Vec<u16> = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| unit([pair[0], pair[1]]))
         .collect();
     if cut

@@ -1,15 +1,19 @@
 [package]
-name = "sootmark-plist"
-version = "0.1.0"
-edition = "2021"
-rust-version = "1.80"
+name = "ys-browser-parser-plist"
+version = "1.0.0"
+authors = ["Florian Amette", "Zach Mathis (@yamatosecurity)"]
+# Yamato Security's fork of the upstream crate (https://github.com/Sootmark/plist): not published
+# under the upstream name.
+publish = false
+edition = "2024"
+rust-version = "1.99"
 description = "Reader of Apple property lists for forensics: binary (bplist00) and XML, every object type, NSKeyedArchiver archives resolved, damage reported rather than fatal."
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/Sootmark/plist"
-homepage = "https://sootmark.com"
+license = "RPL-1.5 AND (MIT OR Apache-2.0)"
+repository = "https://github.com/Yamato-Security/ys-browser-parser"
+homepage = "https://github.com/Yamato-Security/ys-browser-parser"
 keywords = ["forensics", "dfir", "incident-response", "plist", "macos"]
 # Sources only: test fixtures stay in the repository.
-include = ["/src", "/README.md", "/LICENSE-APACHE", "/LICENSE-MIT"]
+include = ["/src", "/README.md", "/LICENSE", "/LICENSE-APACHE", "/LICENSE-MIT"]
 
 [lib]
 name = "plist"

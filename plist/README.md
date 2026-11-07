@@ -2,9 +2,11 @@
 
 Apple property lists, read without CoreFoundation: binary (`bplist00`) and XML, as macOS and iOS store preferences, launch agents and daemons, application bundles' `Info.plist`, Safari and Finder state, Bluetooth and Wi-Fi history, backups' manifests, and the NSKeyedArchiver archives inside many of them. Written after Apple's open-source CoreFoundation ([CFBinaryPList.c and CFPropertyList.c](https://github.com/apple-oss-distributions/CF)) and the [property list DTD](https://www.apple.com/DTDs/PropertyList-1.0.dtd). Read-only, and no dependencies but Sootmark's own timestamp type.
 
+Part of [ys-browser-parser](https://github.com/Yamato-Security/ys-browser-parser), Yamato Security's fork of Sootmark's [plist](https://github.com/Sootmark/plist).
+
 ```toml
 [dependencies]
-sootmark-plist = "0.1"
+plist = { package = "ys-browser-parser-plist", git = "https://github.com/Yamato-Security/ys-browser-parser", rev = "<commit>" }
 ```
 
 ```rust
@@ -54,4 +56,4 @@ Every read ends and memory stays proportional to the input: nesting is bounded a
 
 ## Licence
 
-MIT or Apache-2.0, at your option. The plaso test files are Apache-2.0 (see `tests/fixtures/plaso/NOTICE`); the generated and authored fixtures are this repository's.
+The Reciprocal Public License 1.5 (`LICENSE`), as the rest of [ys-browser-parser](https://github.com/Yamato-Security/ys-browser-parser#licence); the code changed from [Sootmark/plist](https://github.com/Sootmark/plist) stays under MIT or Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`). The plaso test files are Apache-2.0 (see `tests/fixtures/plaso/NOTICE`); the generated and authored fixtures are this repository's.

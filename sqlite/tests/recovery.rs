@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/sqlite (https://github.com/Sootmark/sqlite), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Recovery of deleted records against what the fixtures' generator deleted
 //! (`tests/oracle/recovery/`, written by `tests/fixtures/recovery/gen.sh`):
 //! every deleted row whose record SQLite left on disk is recovered, in its
@@ -163,7 +180,7 @@ fn report(fixture: &str, score: &Score) {
 /// a prefix).
 fn matches(record: &RecoveredRecord, row: &Deleted) -> bool {
     record.table.as_deref() == Some(row.table.as_str())
-        && record.rowid.map_or(true, |rowid| rowid == row.rowid)
+        && record.rowid.is_none_or(|rowid| rowid == row.rowid)
         && record.values.len() == row.values.len()
         && record
             .values
@@ -213,11 +230,7 @@ fn local_size(payload: usize, usable: usize) -> usize {
         return payload;
     }
     let kept = least + (payload - least) % (usable - 4);
-    if kept <= most {
-        kept
-    } else {
-        least
-    }
+    if kept <= most { kept } else { least }
 }
 
 /// A record as SQLite writes it (file format 4): the rowid alias as NULL,
@@ -303,7 +316,11 @@ fn deleted_rows_dropped_tables_and_overflow() {
     let (score, recovered) = score("deleted.db", None);
     assert_perfect("deleted.db", &score);
     assert_eq!(recovered.problems, Vec::<String>::new());
-    assert!(recovered.older_versions.is_empty());
+    assert!(
+        recovered.older_versions.is_empty(),
+        "{:?}",
+        recovered.older_versions
+    );
     // The dropped table, read back from its deleted schema row; its rows,
     // whole, from the freelist leaf pages that were its leaves.
     let names: Vec<&str> = recovered
@@ -408,14 +425,18 @@ fn older_versions_in_the_log() {
         })
         .count();
     assert_eq!(deleted_in_frames, 7);
-    assert!(recovered
-        .records
-        .iter()
-        .all(|record| !record.page_state.is_older_version()));
-    assert!(recovered
-        .older_versions
-        .iter()
-        .all(|record| record.page_state.is_older_version()));
+    assert!(
+        recovered
+            .records
+            .iter()
+            .all(|record| !record.page_state.is_older_version())
+    );
+    assert!(
+        recovered
+            .older_versions
+            .iter()
+            .all(|record| record.page_state.is_older_version())
+    );
 }
 
 /// The reader's own log fixture (`tests/fixtures/gen.sh`), made for
@@ -435,17 +456,21 @@ fn the_reader_log_fixture_keeps_older_versions() {
     assert!(older.iter().any(|record| record.rowid == Some(4)
         && body(record).starts_with("round one, note 4: ")
         && matches!(record.page_state, PageState::Superseded { .. })));
-    assert!(older
-        .iter()
-        .any(|record| record.rowid == Some(3) && body(record).starts_with("round one, note 3: ")));
+    assert!(
+        older.iter().any(
+            |record| record.rowid == Some(3) && body(record).starts_with("round one, note 3: ")
+        )
+    );
     let never_committed: Vec<_> = older
         .iter()
         .filter(|record| body(record).starts_with("round three, never committed"))
         .collect();
-    assert!(!never_committed.is_empty());
-    assert!(never_committed
-        .iter()
-        .all(|record| matches!(record.page_state, PageState::Uncommitted { .. })));
+    assert!(!never_committed.is_empty(), "nothing read");
+    assert!(
+        never_committed
+            .iter()
+            .all(|record| matches!(record.page_state, PageState::Uncommitted { .. }))
+    );
     assert_eq!(older.len(), never_committed.len() + 2, "{older:#?}");
 }
 
@@ -487,9 +512,9 @@ fn live_rows_are_never_reported() {
                 .unwrap_or_default();
             let is_live =
                 live.iter().any(|row| {
-                    record.rowid.map_or(true, |rowid| rowid == row.rowid)
+                    record.rowid.is_none_or(|rowid| rowid == row.rowid)
                         && record.values.iter().zip(&row.values).all(|(ours, theirs)| {
-                            ours.as_ref().map_or(true, |ours| same(ours, theirs))
+                            ours.as_ref().is_none_or(|ours| same(ours, theirs))
                         })
                 });
             assert!(!is_live, "{fixture}: live row reported: {record:?}");

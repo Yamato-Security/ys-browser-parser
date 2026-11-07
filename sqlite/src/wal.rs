@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/sqlite (https://github.com/Sootmark/sqlite), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! The write-ahead log (`-wal` file): a header, then frames, each a page
 //! of the database as a transaction left it. A reader takes, for each page,
 //! the last valid frame at or before the last commit frame; the other
@@ -271,9 +288,13 @@ fn checksum_words(seed: Checksum, bytes: &[u8], big_endian: bool) -> Checksum {
             u32::from_le_bytes(raw)
         }
     };
-    bytes.chunks_exact(8).fold(seed, |(s0, s1), pair| {
-        let s0 = s0.wrapping_add(word(&pair[..4])).wrapping_add(s1);
-        let s1 = s1.wrapping_add(word(&pair[4..])).wrapping_add(s0);
-        (s0, s1)
-    })
+    bytes
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .fold(seed, |(s0, s1), pair| {
+            let s0 = s0.wrapping_add(word(&pair[..4])).wrapping_add(s1);
+            let s1 = s1.wrapping_add(word(&pair[4..])).wrapping_add(s0);
+            (s0, s1)
+        })
 }
