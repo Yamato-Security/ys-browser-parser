@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/plist (https://github.com/Sootmark/plist), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! The XML a property list is written in, cut into tags and text.
 //!
 //! Enough of XML for property lists, and tolerant of what isn't: start,
@@ -282,7 +299,7 @@ mod tests {
         let document = r#"<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "x.dtd" [ <!ENTITY e "a>b"> ]><!-- a <comment> --><plist version="1.0"><true/></plist>"#;
         let (tokens, problems) = tokens(document);
         assert_eq!(tokens, ["<plist>", "<true/>", "</plist>"]);
-        assert!(problems.is_empty());
+        assert!(problems.is_empty(), "{problems:?}");
     }
 
     #[test]
@@ -290,7 +307,7 @@ mod tests {
         let (tokens, problems) =
             tokens("<s>&lt;&gt;&amp;&quot;&apos;&#65;&#x1F600;<![CDATA[<&amp;>]]></s>");
         assert_eq!(tokens, ["<s>", "<>&\"'A\u{1F600}", "<&amp;>", "</s>"]);
-        assert!(problems.is_empty());
+        assert!(problems.is_empty(), "{problems:?}");
     }
 
     #[test]

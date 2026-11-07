@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/browser (https://github.com/Sootmark/browser), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Safari's cookies (`Cookies.binarycookies`, in `~/Library/Cookies` or an
 //! app's container), a format of Apple's own whose integers are
 //! big-endian in the file's frame and little-endian inside its pages.
@@ -80,7 +97,9 @@ fn page_sizes(reader: &mut Reader<'_>) -> Result<Vec<usize>, String> {
 
 /// A page's share of the checksum: the sum of every fourth byte.
 fn checksum(page: &[u8]) -> u32 {
-    page.iter().step_by(4).map(|&b| u32::from(b)).sum()
+    page.iter()
+        .step_by(4)
+        .fold(0u32, |sum, &byte| sum.wrapping_add(u32::from(byte)))
 }
 
 /// The checksum and footer after the pages, when there.
@@ -217,4 +236,17 @@ fn string(record: &[u8], at: usize) -> Result<String, String> {
         .position(|&b| b == 0)
         .ok_or_else(|| format!("string at {at} not terminated"))?;
     Ok(String::from_utf8_lossy(&bytes[..end]).into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::checksum;
+
+    #[test]
+    fn a_large_cookie_page_checksum_wraps_without_panicking() {
+        // 255 * (u32::MAX / 255 + 1) == u32::MAX + 255, or 254 modulo 2^32.
+        let samples = (u32::MAX / 255 + 1) as usize;
+        let page = vec![255; samples * 4];
+        assert_eq!(checksum(&page), 254);
+    }
 }

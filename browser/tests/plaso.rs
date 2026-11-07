@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/browser (https://github.com/Sootmark/browser), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! plaso's browser test files (Apache-2.0, `tests/fixtures/plaso/`, see
 //! its NOTICE), against what plaso's own tests expect of them
 //! (`tests/parsers/sqlite_plugins/chrome_history.py`, `firefox_history.py`,
@@ -7,8 +24,8 @@
 mod support;
 
 use browser::{
-    read, CoreTransition, DownloadState, History, Kind, PageTransition, Qualifier, Transition,
-    VisitType,
+    CoreTransition, DownloadState, History, Kind, PageTransition, Qualifier, Transition, VisitType,
+    read,
 };
 use common::time::Ts;
 
@@ -164,7 +181,7 @@ fn firefox_places_visits() {
     assert_eq!(visit.title, "Google News");
     assert_eq!(visit.visit_count, Some(1));
     assert_eq!(visit.transition, Transition::Firefox(VisitType::Typed));
-    assert!(history.downloads.is_empty());
+    assert!(history.downloads.is_empty(), "{:?}", history.downloads);
 }
 
 #[test]
@@ -230,7 +247,7 @@ fn firefox_118_annotated_downloads() {
 fn firefox_legacy_downloads() {
     let history = history("downloads.sqlite");
     assert_eq!(history.kind, Kind::FirefoxDownloads);
-    assert!(history.visits.is_empty());
+    assert!(history.visits.is_empty(), "{:?}", history.visits);
     let [download] = history.downloads.as_slice() else {
         panic!("{:?}", history.downloads)
     };
@@ -309,11 +326,13 @@ fn webcache_visits() {
             history.problems
         );
         assert_eq!(history.visits.len(), visits, "{name}");
-        assert!(history
-            .visits
-            .iter()
-            .all(|v| v.user.as_deref() == Some(user)));
-        assert!(history.downloads.is_empty());
+        assert!(
+            history
+                .visits
+                .iter()
+                .all(|v| v.user.as_deref() == Some(user))
+        );
+        assert!(history.downloads.is_empty(), "{:?}", history.downloads);
     }
     let history = read(&fixture("WebCacheV01.dat.gz"), &[]).unwrap();
     let overview = history.visits.iter().find(|v| v.id == 30).unwrap();

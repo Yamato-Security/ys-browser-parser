@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/browser (https://github.com/Sootmark/browser), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Browser history for forensics: the pages visited and the files
 //! downloaded, read from the browser's own database without SQLite or ESE.
 //!
@@ -65,10 +82,10 @@ pub use autofill::AutofillEntry;
 pub use chromecache::{CacheStream, ChromeCache, ChromeCacheEntry};
 pub use cookies::{Cookie, CookieStore};
 pub use extensions::{
-    read_preferences, ContentException, ExtensionActivity, InstalledExtension, Preferences,
+    ContentException, ExtensionActivity, InstalledExtension, Preferences, read_preferences,
 };
 pub use firefoxcache::FirefoxCacheEntry;
-pub use javaidx::{read_java_idx, JavaCacheEntry};
+pub use javaidx::{JavaCacheEntry, read_java_idx};
 pub use load_statistics::{HostRedirect, LoadStatistics, ResourceLoad};
 pub use opera::{TypedEntry, TypedUrl};
 
@@ -388,7 +405,7 @@ pub struct Page {
     pub frecency: Option<i64>,
 }
 
-/// Where and how a deleted entry was found: the record `sootmark-sqlite`
+/// Where and how a deleted entry was found: the record `ys-browser-parser-sqlite`
 /// recovered it from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Provenance {

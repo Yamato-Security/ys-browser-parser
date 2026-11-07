@@ -1,0 +1,4 @@
+# Test fixtures and their expected values are read byte for byte: no line-ending conversion on
+# checkout (Windows), which would change the text values the tests compare.
+*/tests/fixtures/** -text
+*/tests/oracle/** -text

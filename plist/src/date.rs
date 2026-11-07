@@ -1,7 +1,24 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/plist (https://github.com/Sootmark/plist), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Property list dates: seconds since 2001-01-01 UTC in binary files,
 //! ISO 8601 text in XML.
 
-use common::time::{days_from_civil, Precision, Semantic, Ts, TICKS_PER_SECOND};
+use common::time::{Precision, Semantic, TICKS_PER_SECOND, Ts, days_from_civil};
 
 /// Seconds from 1970-01-01 to 2001-01-01, the reference date.
 const REFERENCE_DATE_UNIX_SECONDS: i64 = 978_307_200;

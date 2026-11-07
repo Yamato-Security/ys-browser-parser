@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/plist (https://github.com/Sootmark/plist), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Binary property lists, `bplist00`: an 8-byte header, the objects, a
 //! table of their offsets, and a 32-byte trailer saying where the table
 //! is, how wide its entries and the object references are, how many
@@ -11,10 +28,10 @@
 //! read, bounds the nesting and the total output, and checks every offset
 //! and count against the bytes there are.
 
+use crate::Error;
 use crate::date;
 use crate::limits::{Budget, MAX_DEPTH};
-use crate::value::{duplicate_keys, Value};
-use crate::Error;
+use crate::value::{Value, duplicate_keys};
 
 /// The header of the only version Apple writes.
 pub(crate) const MAGIC: &[u8] = b"bplist00";
@@ -272,7 +289,9 @@ impl<'a> Objects<'a> {
             .ok_or_else(|| format!("{units} UTF-16 units"))?;
         let bytes = self.bytes(start, len)?;
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_be_bytes([pair[0], pair[1]]));
         let mut unpaired = false;
         let text = char::decode_utf16(units)

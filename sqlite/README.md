@@ -2,9 +2,11 @@
 
 SQLite database files, read without SQLite: the header, the schema, the rows of every table, the entries of every index, the committed frames of a write-ahead log, and the records of deleted rows that SQLite freed but didn't overwrite, read from SQLite's [file format specification](https://www.sqlite.org/fileformat2.html). Read-only, no dependencies, and the file is borrowed, not copied.
 
+Part of [ys-browser-parser](https://github.com/Yamato-Security/ys-browser-parser), Yamato Security's fork of Sootmark's [sqlite](https://github.com/Sootmark/sqlite).
+
 ```toml
 [dependencies]
-sootmark-sqlite = "0.2"
+sqlite = { package = "ys-browser-parser-sqlite", git = "https://github.com/Yamato-Security/ys-browser-parser", rev = "<commit>" }
 ```
 
 ```rust
@@ -81,4 +83,4 @@ Evidence is hostile. Only a file that isn't a database, or whose header can't be
 
 ## Licence
 
-MIT or Apache-2.0, at your option. The test databases are made by the scripts in this repository from synthetic data.
+The Reciprocal Public License 1.5 (`LICENSE`), as the rest of [ys-browser-parser](https://github.com/Yamato-Security/ys-browser-parser#licence); the code changed from [Sootmark/sqlite](https://github.com/Sootmark/sqlite) stays under MIT or Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`). The test databases are made by the scripts in this repository from synthetic data.

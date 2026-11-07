@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/sqlite (https://github.com/Sootmark/sqlite), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! The write-ahead log fixture (`wal.db` and `wal.db-wal`, made by
 //! `tests/fixtures/gen.sh`): a log restarted after a checkpoint, holding one
 //! committed transaction, the spilled frames of one that never committed,
@@ -40,9 +57,11 @@ fn the_log_holds_what_the_file_does_not() {
         body(&after, 25),
         Some("round two: committed to the WAL only")
     );
-    assert!(after
-        .iter()
-        .all(|row| !body(&after, row.rowid).unwrap().starts_with("round three")));
+    assert!(
+        after
+            .iter()
+            .all(|row| !body(&after, row.rowid).unwrap().starts_with("round three"))
+    );
 }
 
 #[test]
@@ -172,7 +191,7 @@ fn big_endian_copy(wal: &[u8]) -> Vec<u8> {
     let mut sums = checksum((0, 0), &big[..24]);
     put_checksum(&mut big[24..32], sums);
     let salts = big[16..24].to_vec();
-    for frame in big[WAL_HEADER_SIZE..].chunks_exact_mut(FRAME_SIZE) {
+    for frame in big[WAL_HEADER_SIZE..].as_chunks_mut::<FRAME_SIZE>().0 {
         if frame[8..16] != salts[..] {
             break;
         }
@@ -185,7 +204,7 @@ fn big_endian_copy(wal: &[u8]) -> Vec<u8> {
 /// The log checksum over big-endian words, written independently of the
 /// crate's.
 fn checksum((mut s0, mut s1): (u32, u32), bytes: &[u8]) -> (u32, u32) {
-    for pair in bytes.chunks_exact(8) {
+    for pair in bytes.as_chunks::<8>().0 {
         let x0 = u32::from_be_bytes(pair[..4].try_into().unwrap());
         let x1 = u32::from_be_bytes(pair[4..].try_into().unwrap());
         s0 = s0.wrapping_add(x0).wrapping_add(s1);
@@ -197,4 +216,101 @@ fn checksum((mut s0, mut s1): (u32, u32), bytes: &[u8]) -> (u32, u32) {
 fn put_checksum(field: &mut [u8], (s0, s1): (u32, u32)) {
     field[..4].copy_from_slice(&s0.to_be_bytes());
     field[4..].copy_from_slice(&s1.to_be_bytes());
+}
+
+/// A checksum-valid test log, made independently of the parser.
+fn test_log(frames: &[(u32, u32, &[u8])]) -> Vec<u8> {
+    let mut log = vec![0; WAL_HEADER_SIZE];
+    log[..4].copy_from_slice(&0x377f_0683u32.to_be_bytes());
+    log[4..8].copy_from_slice(&3_007_000u32.to_be_bytes());
+    log[8..12].copy_from_slice(&(PAGE_SIZE as u32).to_be_bytes());
+    log[16..20].copy_from_slice(&1u32.to_be_bytes());
+    log[20..24].copy_from_slice(&2u32.to_be_bytes());
+    let mut sums = checksum((0, 0), &log[..24]);
+    put_checksum(&mut log[24..32], sums);
+    for &(number, commit, page) in frames {
+        assert_eq!(page.len(), PAGE_SIZE);
+        let mut frame = vec![0; FRAME_HEADER_SIZE];
+        frame[..4].copy_from_slice(&number.to_be_bytes());
+        frame[4..8].copy_from_slice(&commit.to_be_bytes());
+        frame[8..16].copy_from_slice(&log[16..24]);
+        sums = checksum(checksum(sums, &frame[..8]), page);
+        put_checksum(&mut frame[16..24], sums);
+        log.extend(frame);
+        log.extend_from_slice(page);
+    }
+    log
+}
+
+#[test]
+fn rejected_wal_page_one_does_not_replace_the_file_header() {
+    let (file, _) = files();
+    let before = Database::open(&file).unwrap();
+    let mut page = file[..PAGE_SIZE].to_vec();
+    page[16..18].copy_from_slice(&1024u16.to_be_bytes());
+    let log = test_log(&[(1, before.page_count, &page)]);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    assert!(db.wal.is_none());
+    assert_eq!(db.header, before.header);
+    assert_eq!(db.schema, before.schema);
+    assert_eq!(notes(&db), notes(&before));
+    assert!(db.problems.iter().any(|p| p.starts_with("WAL ignored:")));
+}
+
+#[test]
+fn invalid_wal_page_one_keeps_a_readable_file() {
+    let (file, _) = files();
+    let before = Database::open(&file).unwrap();
+    let page = [0; PAGE_SIZE];
+    let log = test_log(&[(1, before.page_count, &page)]);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    assert!(db.wal.is_none());
+    assert_eq!(db.header, before.header);
+    assert_eq!(notes(&db), notes(&before));
+    assert!(db.problems.iter().any(|p| p.starts_with("WAL ignored:")));
+}
+
+#[test]
+fn valid_wal_page_one_can_restore_a_damaged_file_header() {
+    let (mut file, _) = files();
+    let before = Database::open(&file).unwrap();
+    let page = file[..PAGE_SIZE].to_vec();
+    let log = test_log(&[(1, before.page_count, &page)]);
+    let expected = notes(&before);
+    file[..16].fill(0);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    assert!(db.wal.is_some());
+    assert_eq!(notes(&db), expected);
+}
+
+#[test]
+fn a_far_wal_page_does_not_allocate_a_huge_image() {
+    let (file, _) = files();
+    let page = [0; PAGE_SIZE];
+    // Only 536 log bytes, but a 32 MiB logical address. Larger numbers must
+    // not request terabytes of memory from a small evidence file.
+    let log = test_log(&[(65_536, 65_536, &page)]);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    let image = db.image();
+    assert!(
+        image.len() <= 2 * (file.len() + PAGE_SIZE),
+        "{} bytes",
+        image.len()
+    );
+    assert!(db.problems.iter().any(|p| p.contains("available pages")));
+    assert_eq!(notes(&db), notes(&Database::open(&file).unwrap()));
+}
+
+#[test]
+fn small_gaps_still_export_pages_at_their_original_offsets() {
+    let (file, _) = files();
+    let number = (file.len() / PAGE_SIZE) as u32 + 2;
+    let page = [0xa5; PAGE_SIZE];
+    let log = test_log(&[(number, number, &page)]);
+    let db = Database::open_with_wal(&file, &log).unwrap();
+    let image = db.image();
+    assert_eq!(image.len(), number as usize * PAGE_SIZE);
+    assert_eq!(&image[file.len()..file.len() + PAGE_SIZE], &[0; PAGE_SIZE]);
+    assert_eq!(&image[image.len() - PAGE_SIZE..], &page);
+    assert!(db.problems.is_empty(), "{:?}", db.problems);
 }

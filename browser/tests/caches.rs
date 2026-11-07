@@ -1,3 +1,20 @@
+// Copyright (C) 2026 Shirofune Security Co., Ltd.
+// Copyright (c) 2026 Cyber Experts
+//
+// This file is changed from Sootmark/browser (https://github.com/Sootmark/browser), whose code
+// is under the MIT License or the Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE).
+//
+// Unless explicitly acquired and licensed from Licensor under another license, the contents of this
+// file are subject to the Reciprocal Public License ("RPL") Version 1.5, or subsequent versions as
+// allowed by the RPL, and You may not copy or use this file in either source code or executable
+// form, except in compliance with the terms and conditions of the RPL.
+//
+// All software distributed under the RPL is provided strictly on an "AS IS" basis, WITHOUT WARRANTY
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, AND LICENSOR HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+// INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+// PURPOSE, QUIET ENJOYMENT, OR NON-INFRINGEMENT. See the RPL for specific language governing rights
+// and limitations under the RPL.
+
 //! Chromium's and Firefox's disk caches in plaso's test files (Apache-2.0,
 //! `tests/fixtures/plaso/`, see its NOTICE): every event plaso's
 //! `chrome_cache`, `firefox_cache` and `firefox_cache2` parsers make, read
@@ -29,7 +46,7 @@
 mod compare;
 mod support;
 
-use browser::{detect, ChromeCacheEntry, FirefoxCacheEntry, Kind};
+use browser::{ChromeCacheEntry, FirefoxCacheEntry, Kind, detect};
 use common::time::{Semantic, Ts};
 
 /// plaso's own reading of `0xFFFFFFFF`, in microseconds.
@@ -189,7 +206,7 @@ fn chrome_keys_times_and_streams() {
     assert_eq!(long.count(), 2);
     // Without the files, every entry is reported, nothing read.
     let bare = browser::read_chrome_cache(&index, |_| None).unwrap();
-    assert!(bare.entries.is_empty());
+    assert!(bare.entries.is_empty(), "{:?}", bare.entries);
     assert_eq!(bare.problems.last().unwrap(), "data_1: needed, not given");
 }
 
