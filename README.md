@@ -93,6 +93,7 @@ What the fork changes:
 | The crates named after the repository (`ys-browser-parser`, `ys-browser-parser-sqlite`, `ys-browser-parser-plist`; libraries `browser`, `sqlite`, `plist`), version 1.0.0, edition 2024, Rust 1.99 | fork |
 | `WebCacheV01.dat` read with ys-srum-parser's ESE reader instead of sootmark-ese | fork |
 | Firefox's form history (`formhistory.sqlite`): entries with their GUIDs and sources, available removal tombstones, and deleted entries recovered (`read_form_history`; Chromium's `Web Data` too). See the [interpretation limits](browser/README.md#form-history-interpretation). | fork (#2) |
+| Internet Explorer and legacy Edge's `WebCacheV01.dat` read whole (`read_webcache`): downloads (URL, saved and partial paths, size, start, referrer, MIME type), cached files, cookie files and the other containers' entries, and the cookies Windows 10 keeps in the database. Checked against dissect.database's reading of plaso's two WebCache databases: every row the same. | fork (#9) |
 | One workspace and one CI (Linux, macOS, Windows, MSRV, wasm32, cargo-deny, the license notice), actions pinned by commit | fork |
 | Code changed for Rust 1.99's lints (`as_chunks`, `is_multiple_of`, `let` chains) and the 2024 style edition, with the same behaviour (all upstream tests pass) | fork |
 | Safari binary-cookie page checksums wrap correctly for large pages instead of panicking | fork |

@@ -314,9 +314,9 @@ fn every_visit_matches_sqlite3() {
 /// libesedb's reading of the same rows.
 #[test]
 fn webcache_visits() {
-    for (name, visits, user) in [
-        ("WebCacheV01.dat.gz", 113, "test"),
-        ("PartitionsEx-WebCacheV01.dat.gz", 69, "John Doe"),
+    for (name, visits, downloads, user) in [
+        ("WebCacheV01.dat.gz", 113, 2, "test"),
+        ("PartitionsEx-WebCacheV01.dat.gz", 69, 4, "John Doe"),
     ] {
         let history = read(&fixture(name), &[]).unwrap();
         assert_eq!(history.kind, Kind::WebCache);
@@ -326,13 +326,13 @@ fn webcache_visits() {
             history.problems
         );
         assert_eq!(history.visits.len(), visits, "{name}");
+        assert_eq!(history.downloads.len(), downloads, "{name}");
         assert!(
             history
                 .visits
                 .iter()
                 .all(|v| v.user.as_deref() == Some(user))
         );
-        assert!(history.downloads.is_empty(), "{:?}", history.downloads);
     }
     let history = read(&fixture("WebCacheV01.dat.gz"), &[]).unwrap();
     let overview = history.visits.iter().find(|v| v.id == 30).unwrap();

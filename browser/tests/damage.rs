@@ -82,6 +82,7 @@ fn read_everything(data: &[u8], wal: &[u8]) {
     let _ = browser::read_chrome_cache(data, |_| Some(data));
     let _ = browser::read_firefox_cache1("_CACHE_002_", data);
     let _ = browser::read_firefox_cache2(data);
+    let _ = browser::read_webcache(data);
     for name in [
         "History",
         "_CACHE_001_",

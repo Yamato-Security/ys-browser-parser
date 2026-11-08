@@ -47,3 +47,12 @@ are in plaso-extras.tsv).
 
 The *.visits files are written by gen.sh (see it); plaso-extras.tsv from
 plaso's output for the cookie, form history, extension and Safari parsers.
+
+webcache.tsv.gz: every container, visit, download, entry and cookie of plaso's
+two WebCache databases as dissect.database's ESE reader reads them (records
+flagged deleted left out), one line per row, written by webcache_tsv.py (its
+docstring lists the columns and how it decodes the downloads):
+
+    pip install dissect.database
+    python3 -I tests/oracle/webcache_tsv.py tests/fixtures/plaso/WebCacheV01.dat.gz \
+        tests/fixtures/plaso/PartitionsEx-WebCacheV01.dat.gz | LC_ALL=C sort | gzip -9n > tests/oracle/webcache.tsv.gz

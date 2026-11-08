@@ -32,7 +32,9 @@
 //! - Internet Explorer and legacy Edge's `WebCacheV01.dat`, an ESE
 //!   database: the visits of its history containers, with the account
 //!   each was recorded for; local files opened in Explorer as `file:///`
-//!   URLs. Times are FILETIMEs.
+//!   URLs; and its downloads. Times are FILETIMEs. [`read_webcache`] reads
+//!   it whole: its containers, cached files, cookie files and the cookies
+//!   Windows 10 keeps in it too.
 //!
 //! Columns are read by name: one a version lacks reads as `None`, one it
 //! added is ignored. [`read`] takes the database with its write-ahead log,
@@ -92,6 +94,7 @@ pub use opera::{TypedEntry, TypedUrl};
 
 pub use sqlite::{Area, Confidence, Evidence, PageState};
 pub use transition::{CoreTransition, PageTransition, Qualifier, Transition, VisitType};
+pub use webcache::{WebCache, WebCacheContainer, WebCacheCookie, WebCacheDownload, WebCacheEntry};
 
 /// This crate's version, for records of what parsed them.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -545,7 +548,7 @@ impl std::error::Error for Error {}
 /// tables of a [`Kind`].
 pub fn read(database: &[u8], wal: &[u8]) -> Result<History, Error> {
     if is_ese(database) {
-        return read_webcache(database);
+        return webcache_history(database);
     }
     if opera::is_typed_history(database) {
         return Err(Error(format!(
@@ -592,7 +595,7 @@ pub fn read(database: &[u8], wal: &[u8]) -> Result<History, Error> {
             ..Entries::default()
         },
         // `Kind::of` names SQLite databases only; a WebCache reads as one.
-        Kind::WebCache => return read_webcache(database),
+        Kind::WebCache => return webcache_history(database),
         Kind::SafariHistoryPlist
         | Kind::SafariDownloads
         | Kind::Cookies
@@ -793,12 +796,26 @@ fn is_ese(data: &[u8]) -> bool {
     data.get(4..8) == Some(&[0xef, 0xcd, 0xab, 0x89][..])
 }
 
-fn read_webcache(data: &[u8]) -> Result<History, Error> {
+/// Read Internet Explorer and legacy Edge's `WebCacheV01.dat` whole: its
+/// containers, the visits of its history containers, the downloads of its
+/// `iedownload` containers, the entries of the others (cached files, cookie
+/// files, web storage, …) and the cookies of its `CookieEntryEx` tables.
+///
+/// # Errors
+/// When it isn't an ESE database, or has no `Containers` table.
+pub fn read_webcache(data: &[u8]) -> Result<WebCache, Error> {
     let db = ese::Database::open(data).map_err(|e| Error(e.to_string()))?;
     if !webcache::is_webcache(&db) {
         return Err(Error("an ESE database, but not a WebCache".to_owned()));
     }
-    let mut problems = db.problems.clone();
-    let visits = webcache::visits(&db, &mut problems);
-    Ok(History::of_visits(Kind::WebCache, visits, problems))
+    let problems = db.problems.clone();
+    Ok(webcache::read(&db, problems))
+}
+
+/// A WebCache's visits and downloads, as history.
+fn webcache_history(data: &[u8]) -> Result<History, Error> {
+    let cache = read_webcache(data)?;
+    let mut history = History::of_visits(Kind::WebCache, cache.visits, cache.problems);
+    history.downloads = cache.downloads.into_iter().map(|d| d.download).collect();
+    Ok(history)
 }
