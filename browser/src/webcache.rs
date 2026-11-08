@@ -359,12 +359,12 @@ fn visit(container: &WebCacheContainer, table: &Table, row: &Row) -> Option<WebC
 
 /// The page title a history entry's `ResponseHeaders` holds. The record is
 /// property stores ([MS-PROPSTORE]) one after another, each its size (which
-/// excludes the size field itself and includes the storage terminator) then its storages,
-/// each its size, `1SPS`, its property set and its values: size, id, a
-/// reserved byte, then the value's type and the value. The title is the
-/// `PID_INTSITE_TITLE` of the Internet site set, a `VT_LPWSTR`: a count of
-/// UTF-16 units, the NUL included, then the units. None when it isn't there
-/// or doesn't read.
+/// leaves out the size field itself and counts the terminator after its
+/// storages) then its storages, each its size, `1SPS`, its property set and
+/// its values: size, id, a reserved byte, then the value's type and the
+/// value. The title is the `PID_INTSITE_TITLE` of the Internet site set, a
+/// `VT_LPWSTR`: a count of UTF-16 units, the NUL included, then the units.
+/// None when it isn't there, or its store doesn't read whole.
 ///
 /// [MS-PROPSTORE]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-propstore/
 fn page_title(mut record: &[u8]) -> Option<String> {
@@ -402,7 +402,8 @@ fn storages_title(mut storages: &[u8]) -> Option<String> {
     None
 }
 
-/// Read the title only from a complete sequence of integer-named property values.
+/// Read the title only from a complete sequence of integer-named property
+/// values.
 fn values_title(mut values: &[u8], title: &mut Option<String>) -> Option<()> {
     while let Some(size) = u32_at(values, 0).map(|n| n as usize) {
         if size == 0 {
@@ -439,8 +440,8 @@ fn values_title(mut values: &[u8], title: &mut Option<String>) -> Option<()> {
     None
 }
 
-/// A time read as UTC that is the wall clock of an unknown zone.
-/// Keep special values (such as FILETIME sentinels) distinct from missing columns.
+/// A time read as UTC that is the wall clock of an unknown zone. Special
+/// values (such as FILETIME sentinels) stay distinct from missing columns.
 fn local(time: Ts) -> Ts {
     match time.ticks() {
         Some(ticks) => Ts::from_local_ticks(ticks, time.precision()),

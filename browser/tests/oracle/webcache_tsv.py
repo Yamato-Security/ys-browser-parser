@@ -21,9 +21,10 @@ out, as ESE leaves them out.
 
 A visit's title is decoded here independently of the crate, from its `ResponseHeaders`:
 property stores (MS-PROPSTORE) one after another, each size excluding its own field and
-including the storage terminator, whose storage of the
-Internet site property set ({000214A1-0000-0000-C000-000000000046}) holds the title as property
-16, a VT_LPWSTR (a count of UTF-16 units with the NUL, then the units).
+including the storage terminator, whose storage of the Internet site property set
+({000214A1-0000-0000-C000-000000000046}) holds the title as property 16, a VT_LPWSTR (a count
+of UTF-16 units with the NUL, then the units). A title is read only from a store that reads
+whole, NUL-terminated.
 
 Downloads are decoded here independently of the crate, from what their `ResponseHeaders`
 records were seen to hold: the start (a FILETIME at 0x24) and size (a u64 at 0x48) when the
