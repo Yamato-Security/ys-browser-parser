@@ -83,6 +83,7 @@ fn lines(file: &str, cache: &WebCache) -> Vec<String> {
             opt(h.sync_count),
             opt(h.entry_type),
             opt(h.flags),
+            escape(&v.title),
         ]);
     }
     for d in &cache.downloads {
@@ -363,4 +364,51 @@ fn history_times() {
     let history = read(&support::fixture("plaso/WebCacheV01.dat.gz"), &[]).unwrap();
     let visits: Vec<_> = cache.visits.iter().map(|v| v.visit.clone()).collect();
     assert_eq!(history.visits, visits);
+}
+
+/// Page titles from the history entries' property stores: Internet Explorer's and legacy Edge's;
+/// none in a day's container, which keeps no record.
+#[test]
+fn history_titles() {
+    let cache = webcache(FILES[0]);
+    let title = |container: i64, id: i64| {
+        cache
+            .visits
+            .iter()
+            .find(|v| v.container == container && v.visit.id == id)
+            .map(|v| v.visit.title.as_str())
+            .unwrap()
+    };
+    assert_eq!(title(2, 25), "plaso - Google zoeken");
+    assert_eq!(
+        title(2, 30),
+        "Overview - libyal - Overview of libraries - Yet another library library (and tools) - Google Project Hosting"
+    );
+    assert_eq!(title(23, 1), "");
+    let titled = cache
+        .visits
+        .iter()
+        .filter(|v| !v.visit.title.is_empty())
+        .count();
+    let edge = webcache(FILES[1]);
+    let putty = edge
+        .visits
+        .iter()
+        .find(|v| v.container == 18 && v.visit.url.contains("search?q=putty"))
+        .unwrap();
+    assert_eq!(putty.visit.title, "putty - Bing");
+    let edge_titled = edge
+        .visits
+        .iter()
+        .filter(|v| !v.visit.title.is_empty())
+        .count();
+    assert_eq!(titled + edge_titled, 62);
+    // read() gives them with the visits
+    let history = read(&support::fixture("plaso/WebCacheV01.dat.gz"), &[]).unwrap();
+    assert!(
+        history
+            .visits
+            .iter()
+            .any(|v| v.id == 25 && v.title == "plaso - Google zoeken")
+    );
 }

@@ -31,10 +31,10 @@
 //!   older kept downloads.
 //! - Internet Explorer and legacy Edge's `WebCacheV01.dat`, an ESE
 //!   database: the visits of its history containers, with the account
-//!   each was recorded for; local files opened in Explorer as `file:///`
-//!   URLs; and its downloads. Times are FILETIMEs. [`read_webcache`] reads
-//!   it whole: its containers, cached files, cookie files and the cookies
-//!   Windows 10 keeps in it too.
+//!   each was recorded for and the page's title; local files opened in
+//!   Explorer as `file:///` URLs; and its downloads. Times are FILETIMEs.
+//!   [`read_webcache`] reads it whole: its containers, cached files, cookie
+//!   files and the cookies Windows 10 keeps in it too.
 //!
 //! Columns are read by name: one a version lacks reads as `None`, one it
 //! added is ignored. [`read`] takes the database with its write-ahead log,

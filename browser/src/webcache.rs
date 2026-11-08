@@ -47,6 +47,16 @@ const CONTAINERS: &str = "Containers";
 const PARTITIONS_EX: &str = "PartitionsEx";
 const COOKIE_TABLES: &str = "cookieentryex_";
 
+/// The property set of Internet sites (`FMTID_InternetSite` of `intshcut.h`,
+/// `{000214A1-0000-0000-C000-000000000046}`), as stored.
+const FMTID_INTERNET_SITE: [u8; 16] = [
+    0xa1, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
+];
+/// Its page title (`PID_INTSITE_TITLE`).
+const PID_INTSITE_TITLE: u32 = 16;
+/// A NUL-terminated UTF-16 string (`VT_LPWSTR`).
+const VT_LPWSTR: u16 = 0x1f;
+
 /// Containers without an entry table of their own, as plaso notes too.
 const TABLELESS: [&str; 3] = [
     "MicrosoftEdge_DNTException",
@@ -316,7 +326,10 @@ fn visit(container: &WebCacheContainer, table: &Table, row: &Row) -> Option<WebC
         table: table.name.clone(),
         time,
         url: url.to_owned(),
-        title: String::new(),
+        title: get("ResponseHeaders")
+            .and_then(Value::as_bytes)
+            .and_then(page_title)
+            .unwrap_or_default(),
         user: user.map(str::to_owned),
         transition: Transition::NotRecorded,
         from_visit: None,
@@ -342,6 +355,73 @@ fn visit(container: &WebCacheContainer, table: &Table, row: &Row) -> Option<WebC
         entry_type: integer("Type"),
         flags: integer("Flags"),
     })
+}
+
+/// The page title a history entry's `ResponseHeaders` holds. The record is
+/// property stores ([MS-PROPSTORE]) one after another, each its size (which
+/// leaves out the 4-byte terminator after its storages) then its storages,
+/// each its size, `1SPS`, its property set and its values: size, id, a
+/// reserved byte, then the value's type and the value. The title is the
+/// `PID_INTSITE_TITLE` of the Internet site set, a `VT_LPWSTR`: a count of
+/// UTF-16 units, the NUL included, then the units. None when it isn't there
+/// or doesn't read.
+///
+/// [MS-PROPSTORE]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-propstore/
+fn page_title(record: &[u8]) -> Option<String> {
+    let mut at = 0;
+    while let Some(size) = u32_at(record, at) {
+        let size = size as usize;
+        if size == 0 {
+            // the terminator after a store's storages
+            at += 4;
+            continue;
+        }
+        let storages = record.get(at + 4..at.checked_add(size)?)?;
+        if let Some(title) = storages_title(storages) {
+            return Some(title);
+        }
+        at += size;
+    }
+    None
+}
+
+/// The title in a property store's storages, if one is the Internet site set's.
+fn storages_title(storages: &[u8]) -> Option<String> {
+    let mut at = 0;
+    while let Some(size) = u32_at(storages, at).map(|n| n as usize) {
+        if size == 0 {
+            break;
+        }
+        let storage = storages.get(at..at.checked_add(size)?)?;
+        if storage.get(4..8) == Some(b"1SPS")
+            && storage.get(8..24) == Some(&FMTID_INTERNET_SITE[..])
+        {
+            let mut value_at = 24;
+            while let Some(value_size) = u32_at(storage, value_at).map(|n| n as usize) {
+                if value_size == 0 {
+                    break;
+                }
+                let value = storage.get(value_at..value_at.checked_add(value_size)?)?;
+                let kind = value.get(9..11).map(|t| u16::from_le_bytes([t[0], t[1]]));
+                if u32_at(value, 4) == Some(PID_INTSITE_TITLE) && kind == Some(VT_LPWSTR) {
+                    let units = u32_at(value, 13)? as usize;
+                    let text = value.get(17..17usize.checked_add(units.checked_mul(2)?)?)?;
+                    let units: Vec<u16> = text
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
+                        .map(|pair| u16::from_le_bytes(*pair))
+                        .collect();
+                    let title = String::from_utf16(&units).ok()?;
+                    let title = title.trim_end_matches('\0');
+                    return (!title.is_empty()).then(|| title.to_owned());
+                }
+                value_at += value_size;
+            }
+        }
+        at += size;
+    }
+    None
 }
 
 /// A time read as UTC that is the wall clock of an unknown zone.
@@ -783,6 +863,97 @@ mod tests {
             assert_eq!(period.entry_type, main.entry_type);
             assert_eq!(period.flags, main.flags);
         }
+    }
+
+    /// A property store of `values` (id, type, value bytes) in the property set `set`.
+    fn property_store(set: [u8; 16], values: &[(u32, u16, Vec<u8>)]) -> Vec<u8> {
+        let mut storage = Vec::new();
+        storage.extend_from_slice(b"1SPS");
+        storage.extend_from_slice(&set);
+        for (id, kind, value) in values {
+            let size = 4 + 4 + 1 + 4 + value.len();
+            storage.extend((size as u32).to_le_bytes());
+            storage.extend(id.to_le_bytes());
+            storage.push(0);
+            storage.extend(u32::from(*kind).to_le_bytes());
+            storage.extend(value);
+        }
+        storage.extend(0u32.to_le_bytes());
+        let mut store = ((storage.len() + 4) as u32).to_le_bytes().to_vec();
+        store.extend(storage);
+        let mut record = ((store.len() + 4) as u32).to_le_bytes().to_vec();
+        record.extend(store);
+        record
+    }
+
+    fn lpwstr(text: &str) -> Vec<u8> {
+        let units: Vec<u16> = text.encode_utf16().chain([0]).collect();
+        let mut value = (units.len() as u32).to_le_bytes().to_vec();
+        value.extend(units.iter().flat_map(|u| u.to_le_bytes()));
+        value
+    }
+
+    #[test]
+    fn page_titles_of_property_stores() {
+        let site = FMTID_INTERNET_SITE;
+        let title = (
+            PID_INTSITE_TITLE,
+            VT_LPWSTR,
+            lpwstr("Prefetch - Forensics Wiki"),
+        );
+        let flags = (9, 0x13, 1u32.to_le_bytes().to_vec());
+        let record = property_store(site, &[flags.clone(), title.clone()]);
+        assert_eq!(
+            page_title(&record).as_deref(),
+            Some("Prefetch - Forensics Wiki")
+        );
+        // a second store after the terminator, as Windows writes them
+        let mut two = property_store(site, std::slice::from_ref(&flags));
+        two.extend(0u32.to_le_bytes());
+        two.extend(property_store(site, std::slice::from_ref(&title)));
+        assert_eq!(
+            page_title(&two).as_deref(),
+            Some("Prefetch - Forensics Wiki")
+        );
+        // Unicode stays as it is
+        let record = property_store(
+            site,
+            &[(PID_INTSITE_TITLE, VT_LPWSTR, lpwstr("准胝 – Juntei"))],
+        );
+        assert_eq!(page_title(&record).as_deref(), Some("准胝 – Juntei"));
+        // another property set, another property, another type, an empty title: none
+        let mut other = site;
+        other[0] ^= 1;
+        for record in [
+            property_store(other, std::slice::from_ref(&title)),
+            property_store(
+                site,
+                &[(21, VT_LPWSTR, lpwstr("https://example.com/favicon.ico"))],
+            ),
+            property_store(site, &[(PID_INTSITE_TITLE, 0x08, lpwstr("a BSTR"))]),
+            property_store(site, &[(PID_INTSITE_TITLE, VT_LPWSTR, lpwstr(""))]),
+            Vec::new(),
+            b"HTTP/1.1 200 OK\r\n\r\n".to_vec(),
+        ] {
+            assert_eq!(page_title(&record), None, "{record:02x?}");
+        }
+        // damaged: every truncation and a size past the end read as none, without panicking
+        let record = property_store(site, &[flags, title]);
+        for end in 0..record.len() {
+            let _ = page_title(&record[..end]);
+        }
+        let mut huge = record.clone();
+        huge[..4].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(page_title(&huge), None);
+        // a count of units past the value's end
+        let count_at = record.len() - 4 - lpwstr("Prefetch - Forensics Wiki").len();
+        assert_eq!(
+            u32_at(&record, count_at),
+            Some("Prefetch - Forensics Wiki".len() as u32 + 1)
+        );
+        let mut long = record;
+        long[count_at..count_at + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(page_title(&long), None);
     }
 
     fn utf16(strings: &[&str]) -> Vec<u8> {

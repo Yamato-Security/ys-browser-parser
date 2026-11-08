@@ -345,6 +345,11 @@ fn webcache_visits() {
         Some("2014-05-12T07:31:06.1252928Z")
     );
     assert_eq!(overview.transition.to_string(), "");
+    assert!(
+        overview.title.starts_with("Overview - libyal"),
+        "{}",
+        overview.title
+    );
     assert_eq!(
         browser::detect(
             "Users/test/AppData/Local/Microsoft/Windows/WebCache/WebCacheV01.dat",

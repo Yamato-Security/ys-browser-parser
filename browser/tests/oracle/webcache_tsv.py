@@ -4,7 +4,7 @@ One line per row, by kind (the first two columns are the file, as given, and the
 
     container  id, name, directory, secure directories (joined with |), last access, last scavenge
     visit      table, id, account, url, time (AccessedTime), created, modified, expires, synced,
-               sync count, type, flags
+               sync count, type, flags, title
     download   container, id, url, target path, current path, start, size, referrer,
                MIME type, publisher, AccessedTime
     entry      container, its name, id, url, account, file name, file path, file size, type,
@@ -18,6 +18,11 @@ missing values. The `ModifiedTime` of a day's or a week's history container (`MS
 system's local time: it is written without the `Z`. Backslashes, tabs, carriage returns and line feeds in text are written as
 \\\\, \\t, \\r and \\n. Records flagged deleted on their page (not yet cleaned up) are left
 out, as ESE leaves them out.
+
+A visit's title is decoded here independently of the crate, from its `ResponseHeaders`:
+property stores (MS-PROPSTORE) one after another, a zero size between them, whose storage of the
+Internet site property set ({000214A1-0000-0000-C000-000000000046}) holds the title as property
+16, a VT_LPWSTR (a count of UTF-16 units with the NUL, then the units).
 
 Downloads are decoded here independently of the crate, from what their `ResponseHeaders`
 records were seen to hold: the start (a FILETIME at 0x24) and size (a u64 at 0x48) when the
@@ -125,6 +130,54 @@ def trailing_strings(data):
     return strings[::-1]
 
 
+FMTID_INTERNET_SITE = bytes.fromhex("a114020000000000c000000000000046")
+
+
+def page_title(record):
+    """The title property (16, VT_LPWSTR) of the Internet site set in a history entry's record."""
+    if not record:
+        return None
+    pos = 0
+    while pos + 4 <= len(record):
+        (size,) = struct.unpack_from("<I", record, pos)
+        if size == 0:
+            pos += 4
+            continue
+        if pos + size > len(record):
+            return None
+        store = record[pos + 4 : pos + size]
+        spos = 0
+        while spos + 4 <= len(store):
+            (ssize,) = struct.unpack_from("<I", store, spos)
+            if ssize == 0 or spos + ssize > len(store):
+                break
+            storage = store[spos : spos + ssize]
+            if storage[4:8] == b"1SPS" and storage[8:24] == FMTID_INTERNET_SITE:
+                vpos = 24
+                while vpos + 4 <= len(storage):
+                    (vsize,) = struct.unpack_from("<I", storage, vpos)
+                    if vsize == 0 or vpos + vsize > len(storage):
+                        break
+                    value = storage[vpos : vpos + vsize]
+                    if len(value) >= 17:
+                        (pid,) = struct.unpack_from("<I", value, 4)
+                        (vt,) = struct.unpack_from("<H", value, 9)
+                        (units,) = struct.unpack_from("<I", value, 13)
+                        if pid == 16 and vt == 0x1F:
+                            text = value[17 : 17 + 2 * units]
+                            if len(text) < 2 * units:
+                                return None
+                            try:
+                                title = text.decode("utf-16le").rstrip("\x00")
+                            except UnicodeDecodeError:
+                                return None
+                            return title or None
+                    vpos += vsize
+            spos += ssize
+        pos += size
+    return None
+
+
 def is_path(value):
     return value.startswith(("\\\\", "//")) or (
         len(value) > 2 and value[0].isascii() and value[0].isalpha() and value[1:3] in (":\\", ":/")
@@ -164,7 +217,8 @@ def read(name, data):
                     modified = modified[:-1]
                 line(name, "visit", table, get("EntryId"), user, url, filetime(get("AccessedTime")),
                      filetime(get("CreationTime")), modified, filetime(get("ExpiryTime")),
-                     filetime(get("SyncTime")), get("SyncCount"), get("Type"), get("Flags"))
+                     filetime(get("SyncTime")), get("SyncCount"), get("Type"), get("Flags"),
+                     page_title(get("ResponseHeaders")))
             elif cname == "iedownload":
                 record = get("ResponseHeaders") or b""
                 header = struct.unpack_from("<I", record, 0)[0] if len(record) >= 4 else 0
