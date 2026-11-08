@@ -18,13 +18,12 @@ b2a6f96), sootmark-sqlite 0.2.0 (Sootmark/sqlite a42d881) and sootmark-plist 0.1
   containers (URL, saved and partial paths, size, start, referrer, MIME type, publisher), the
   entries of the others (cached files with their path and HTTP headers, cookie files, web
   storage, compatibility lists, …) and the cookies of its `CookieEntryEx` tables (Windows 10 and
-  later) with whose they are (`PartitionsEx`). `read` gives a WebCache's downloads with its
-  visits. (#9) (@YamatoSecurity)
+  later) with whose they are (`PartitionsEx`). A download whose header doesn't fit its record,
+  or whose last strings aren't a URL and a Windows path, keeps only the entry's own URL and
+  access time, with a problem. `read` gives a WebCache's downloads with its visits. (#9)
+  (@YamatoSecurity)
 
 ### Fixed
-- WebCache download decoding rejects out-of-bounds headers and unrecognized URL/path layouts
-  instead of presenting their bytes as download metadata; the entry's own URL and access time
-  remain available with a diagnostic. (@YamatoSecurity)
 - Form-history recovery keeps tombstone-confirmed deleted Firefox GUIDs separate when a value
   is entered again, and does not mislabel an older value of a live GUID as deleted. GUID-only
   renames and records with missing GUIDs retain conservative field/value matching. (@YamatoSecurity)

@@ -61,14 +61,9 @@ for problem in &history.problems {
   - the entries of every other container (`WebCacheEntry`): cached files (`Content`, with their file's path through the container's secure directories and their HTTP response headers), cookie files (`Cookies`, `Cookie:alice@example.com/`), web storage (`DOMStore`), compatibility lists (`iecompat`) and the rest, each with its URL as stored, file name, size, type, flags, access count and times (created, modified, accessed, expires, synced);
   - the cookies Windows 10 and later keep in the database (`CookieEntryEx` tables, `WebCacheCookie`): host (`RDomain` turned around), path, name, value, expiry, last modification and flags, with the directory `PartitionsEx` gives the table (whose cookies they are).
 
-  Records ESE flags as deleted on their page, not yet cleaned up, are left out, as ESE leaves them out.
+  A download's start and size are read only when its header fits the record, and its strings only when the last two are a URL and a Windows path (a drive or UNC path, with either separator); otherwise the entry's own URL and access time are kept, and a problem says why. A publisher is the name the browser recorded, not a check of the file's signature.
 
-  A download's header must fit its blob before the start and size are decoded, and the trailing
-  strings must contain a recognizable URL and Windows path before they are used. Unrecognized
-  or damaged layouts produce a problem and retain the entry's own URL and access time.
-  A publisher is a name recorded by the browser, not verification
-  of an executable's Authenticode signature. ESE transaction logs are not replayed: a dirty
-  database can be missing changes that exist only in its log files, and this is reported.
+  Records ESE flags as deleted on their page, not yet cleaned up, are left out, as ESE leaves them out. ESE's transaction logs are not replayed: a database that wasn't shut down cleanly can lack changes still only in its logs, and a problem says so (`dirty shutdown`).
 
 - `read_form_history`: a form history whole, as `read` does history: the entries, the deleted entries the database and its write-ahead log still hold (`deleted`, each with its `Provenance`; older versions of a live GUID are excluded; tombstones distinguish removed Firefox GUIDs even when the same value is entered again), and Firefox's record of removed entries (`moz_deleted_formhistory`: the GUID and when), whose GUID a recovered entry carries too. `detect` tells `formhistory.sqlite` by its tables or name (`Kind::Autofill`, as `Web Data`).
 
