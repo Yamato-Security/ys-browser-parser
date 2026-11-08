@@ -18,9 +18,11 @@ b2a6f96), sootmark-sqlite 0.2.0 (Sootmark/sqlite a42d881) and sootmark-plist 0.1
   containers (URL, saved and partial paths, size, start, referrer, MIME type, publisher), the
   entries of the others (cached files with their path and HTTP headers, cookie files, web
   storage, compatibility lists, …) and the cookies of its `CookieEntryEx` tables (Windows 10 and
-  later) with whose they are (`PartitionsEx`). A download whose header doesn't fit its record,
-  or whose last strings aren't a URL and a Windows path, keeps only the entry's own URL and
-  access time, with a problem. `read` gives a WebCache's downloads with its visits. (#9)
+  later) with whose they are (`PartitionsEx`). A download whose header is smaller than `0x50`
+  bytes or extends beyond its record falls back to the entry's URL and access time, with no
+  size, paths or other trailing-string fields. If only the trailing URL/path validation fails,
+  the entry's URL is used but the decoded start time and size are retained. Both cases produce
+  a diagnostic. `read` gives a WebCache's downloads with its visits. (#9)
   (@YamatoSecurity)
 
 ### Fixed
