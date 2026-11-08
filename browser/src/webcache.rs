@@ -91,7 +91,7 @@ pub struct WebCacheVisit {
     /// ([`Semantic::LocalUnknownZone`](common::time::Semantic::LocalUnknownZone));
     /// in `History`, UTC.
     pub modified: Option<Ts>,
-    /// `ExpiryTime`: when the entry leaves the history.
+    /// `ExpiryTime`: the recorded expiration, not proof that the entry was removed.
     pub expires: Option<Ts>,
     /// `SyncTime`.
     pub synced: Option<Ts>,
@@ -332,7 +332,7 @@ fn visit(container: &WebCacheContainer, table: &Table, row: &Row) -> Option<WebC
         container: container.id,
         created: filetime(get("CreationTime")),
         modified: if container.name.starts_with("MSHist") {
-            modified.and_then(local)
+            modified.map(local)
         } else {
             modified
         },
@@ -345,8 +345,12 @@ fn visit(container: &WebCacheContainer, table: &Table, row: &Row) -> Option<WebC
 }
 
 /// A time read as UTC that is the wall clock of an unknown zone.
-fn local(time: Ts) -> Option<Ts> {
-    Some(Ts::from_local_ticks(time.ticks()?, time.precision()))
+/// Keep special values (such as FILETIME sentinels) distinct from missing columns.
+fn local(time: Ts) -> Ts {
+    match time.ticks() {
+        Some(ticks) => Ts::from_local_ticks(ticks, time.precision()),
+        None => time,
+    }
 }
 
 fn entry(container: &WebCacheContainer, table: &Table, row: &Row) -> WebCacheEntry {
@@ -714,6 +718,72 @@ fn split_url(raw: &str) -> (Option<&str>, &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Parse a history row using the real schema, replacing only the modified time.
+    fn history_with_modified(container_name: &str, modified: Value) -> WebCacheVisit {
+        use std::io::Read;
+        let mut data = Vec::new();
+        common::gzip::Decoder::new(
+            &include_bytes!("../tests/fixtures/plaso/WebCacheV01.dat.gz")[..],
+        )
+        .read_to_end(&mut data)
+        .unwrap();
+        let db = Database::open(&data).unwrap();
+        let mut container = containers(&db, &mut Vec::new())
+            .into_iter()
+            .find(|c| c.name == "History")
+            .unwrap();
+        let table = db.table(&format!("Container_{}", container.id)).unwrap();
+        let mut row = db.rows(&table.name).unwrap().next().unwrap();
+        row.values[table.column_index("ModifiedTime").unwrap()] = modified;
+        container.name = container_name.to_owned();
+        visit(&container, table, &row).unwrap()
+    }
+
+    #[test]
+    fn history_modified_preserves_sentinels_and_missing_values() {
+        use common::time::Semantic;
+        for container in [
+            "History",
+            "MSHist012014051220140513",
+            "MSHist012014051220140519",
+        ] {
+            let history = history_with_modified(container, Value::I64(i64::MAX));
+            assert_eq!(
+                history.modified.map(|t| t.semantic()),
+                Some(Semantic::Sentinel),
+                "{container}: a sentinel must not become a missing column"
+            );
+            assert_eq!(history.modified.unwrap().to_iso8601(), None);
+            for missing in [Value::Null, Value::I64(0), Value::I64(-1)] {
+                let history = history_with_modified(container, missing);
+                assert_eq!(history.modified, None, "{container}");
+            }
+        }
+    }
+
+    #[test]
+    fn period_history_local_time_retains_ticks_and_other_utc_fields() {
+        use common::time::Semantic;
+        let ticks = 130_443_606_416_860_001;
+        let main = history_with_modified("History", Value::I64(ticks));
+        let modified = main.modified.unwrap();
+        assert_eq!(modified.semantic(), Semantic::Utc);
+        for container in ["MSHist012014051220140513", "MSHist012014051220140519"] {
+            let period = history_with_modified(container, Value::I64(ticks));
+            let local_modified = period.modified.unwrap();
+            assert_eq!(local_modified.semantic(), Semantic::LocalUnknownZone);
+            assert_eq!(local_modified.ticks(), modified.ticks());
+            assert_eq!(local_modified.precision(), modified.precision());
+            assert_eq!(period.visit, main.visit);
+            assert_eq!(period.created, main.created);
+            assert_eq!(period.expires, main.expires);
+            assert_eq!(period.synced, main.synced);
+            assert_eq!(period.sync_count, main.sync_count);
+            assert_eq!(period.entry_type, main.entry_type);
+            assert_eq!(period.flags, main.flags);
+        }
+    }
 
     fn utf16(strings: &[&str]) -> Vec<u8> {
         strings
