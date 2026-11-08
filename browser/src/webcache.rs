@@ -394,19 +394,24 @@ fn download(
         .and_then(Value::as_bytes)
         .unwrap_or_default();
     let header = u32_at(record, 0).map_or(0, |size| size as usize);
-    let numbers = header >= DOWNLOAD_HEADER_MIN && record.len() >= DOWNLOAD_HEADER_MIN;
-    let start = numbers
+    let valid_header = (DOWNLOAD_HEADER_MIN..=record.len()).contains(&header);
+    let start = valid_header
         .then(|| u64_at(record, DOWNLOAD_START))
         .flatten()
         .filter(|&ticks| ticks != 0)
         .map(Ts::from_filetime)
         .or(accessed);
-    let size = numbers
+    let size = valid_header
         .then(|| u64_at(record, DOWNLOAD_SIZE))
         .flatten()
         .and_then(|size| i64::try_from(size).ok());
     // The strings are aligned on the record's end, not its header's (0x89).
-    let tail = record.get(header.min(record.len())..).unwrap_or_default();
+    // A corrupt length must not turn bytes of another layout into a size,
+    // timestamp or string section. Keep the entry's own URL/access time instead.
+    let tail = record
+        .get(header..)
+        .filter(|_| valid_header)
+        .unwrap_or_default();
     let mut strings = trailing_strings(&tail[tail.len() % 2..]);
     let mut download = Download {
         id,
@@ -428,9 +433,19 @@ fn download(
         deleted: None,
     };
     let mut publisher = None;
-    if strings.len() < 2 {
+    let valid_strings = strings.len() >= 2
+        && is_path(&strings[strings.len() - 1])
+        && is_uri(&strings[strings.len() - 2]);
+    if !valid_header {
         problems.push(format!(
-            "{}: download {id}: no URL and path in its record",
+            "{}: download {id}: invalid header size {header} for {} bytes",
+            table.name,
+            record.len()
+        ));
+        download.url = text(get("Url")).unwrap_or_default();
+    } else if !valid_strings {
+        problems.push(format!(
+            "{}: download {id}: no valid URL and Windows path in its record",
             table.name
         ));
         download.url = text(get("Url")).unwrap_or_default();
@@ -495,7 +510,26 @@ fn trailing_strings(data: &[u8]) -> Vec<String> {
 fn is_path(string: &str) -> bool {
     let bytes = string.as_bytes();
     string.starts_with("\\\\")
-        || (bytes.len() > 2 && bytes[0].is_ascii_alphabetic() && &bytes[1..3] == b":\\")
+        || string.starts_with("//")
+        || (bytes.len() > 2
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && matches!(bytes[2], b'\\' | b'/'))
+}
+
+/// An absolute URI, including `file:`, `data:` and `blob:` downloads.
+fn is_uri(string: &str) -> bool {
+    string.split_once(':').is_some_and(|(scheme, rest)| {
+        !rest.is_empty()
+            && !is_path(string)
+            && scheme
+                .as_bytes()
+                .first()
+                .is_some_and(u8::is_ascii_alphabetic)
+            && scheme
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"+.-".contains(&b))
+    })
 }
 
 /// `type/subtype`: letters, digits and `+.-` only.
@@ -633,6 +667,93 @@ mod tests {
             .flat_map(|s| s.encode_utf16().chain([0]))
             .flat_map(u16::to_le_bytes)
             .collect()
+    }
+
+    /// A real entry's schema with an independently constructed download blob.
+    fn read_download(record: Vec<u8>) -> (WebCacheDownload, Vec<String>) {
+        use std::io::Read;
+        let mut data = Vec::new();
+        common::gzip::Decoder::new(
+            &include_bytes!("../tests/fixtures/plaso/WebCacheV01.dat.gz")[..],
+        )
+        .read_to_end(&mut data)
+        .unwrap();
+        let db = Database::open(&data).unwrap();
+        let mut problems = Vec::new();
+        let container = containers(&db, &mut problems)
+            .into_iter()
+            .find(|c| c.name == "iedownload")
+            .unwrap();
+        let table = db.table(&format!("Container_{}", container.id)).unwrap();
+        let mut row = db.rows(&table.name).unwrap().next().unwrap();
+        row.values[table.column_index("ResponseHeaders").unwrap()] = Value::Binary(record);
+        row.values[table.column_index("Url").unwrap()] =
+            Value::Text("https://example.com/fallback.exe".into());
+        problems.clear();
+        (download(&container, table, &row, &mut problems), problems)
+    }
+
+    fn download_blob(strings: &[&str]) -> Vec<u8> {
+        let mut record = vec![0; 0x8c];
+        record[..4].copy_from_slice(&0x8cu32.to_le_bytes());
+        record[DOWNLOAD_START..DOWNLOAD_START + 8]
+            .copy_from_slice(&133_000_000_000_000_000u64.to_le_bytes());
+        record[DOWNLOAD_SIZE..DOWNLOAD_SIZE + 8].copy_from_slice(&1234u64.to_le_bytes());
+        record.extend(utf16(strings));
+        record
+    }
+
+    #[test]
+    fn download_header_must_fit_the_record() {
+        for size in [0, (DOWNLOAD_HEADER_MIN - 1) as u32, u32::MAX] {
+            let mut record = download_blob(&["https://example.com/a.exe", "C:\\a.exe"]);
+            record[..4].copy_from_slice(&size.to_le_bytes());
+            let (found, problems) = read_download(record);
+            assert_eq!(found.download.total_bytes, None, "header size {size}");
+            assert_eq!(found.download.start, found.accessed);
+            assert_eq!(found.download.url, "https://example.com/fallback.exe");
+            assert_eq!(found.download.target_path, "");
+            assert!(
+                problems.iter().any(|p| p.contains("header")),
+                "{problems:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn download_strings_must_identify_a_url_and_windows_path() {
+        for (url, path) in [
+            ("not a URL", "C:\\a.exe"),
+            ("https://example.com/a.exe", "not a path"),
+            ("not a URL", "not a path"),
+        ] {
+            let (found, problems) = read_download(download_blob(&[url, path]));
+            assert_eq!(found.download.url, "https://example.com/fallback.exe");
+            assert_eq!(found.download.target_path, "");
+            assert_eq!(problems.len(), 1);
+        }
+    }
+
+    #[test]
+    fn valid_download_uris_and_unicode_paths_remain_readable() {
+        for url in [
+            "https://example.com/a.exe",
+            "file:///C:/source/a.exe",
+            "data:application/octet-stream;base64,QQ==",
+            "blob:https://example.com/download-id",
+        ] {
+            for path in [
+                r"C:\Users\田中\a.exe",
+                "C:/Downloads/a.exe",
+                r"\\server\share\a.exe",
+            ] {
+                let (found, problems) = read_download(download_blob(&[url, path]));
+                assert_eq!(found.download.url, url);
+                assert_eq!(found.download.target_path, path);
+                assert_eq!(found.download.total_bytes, Some(1234));
+                assert!(problems.is_empty(), "{problems:?}");
+            }
+        }
     }
 
     #[test]

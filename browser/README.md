@@ -63,6 +63,13 @@ for problem in &history.problems {
 
   Records ESE flags as deleted on their page, not yet cleaned up, are left out, as ESE leaves them out.
 
+  A download's header must fit its blob before the start and size are decoded, and the trailing
+  strings must contain a recognizable URL and Windows path before they are used. Unrecognized
+  or damaged layouts produce a problem and retain the entry's own URL and access time.
+  A publisher is a name recorded by the browser, not verification
+  of an executable's Authenticode signature. ESE transaction logs are not replayed: a dirty
+  database can be missing changes that exist only in its log files, and this is reported.
+
 - `read_form_history`: a form history whole, as `read` does history: the entries, the deleted entries the database and its write-ahead log still hold (`deleted`, each with its `Provenance`; older versions of a live GUID are excluded; tombstones distinguish removed Firefox GUIDs even when the same value is entered again), and Firefox's record of removed entries (`moz_deleted_formhistory`: the GUID and when), whose GUID a recovered entry carries too. `detect` tells `formhistory.sqlite` by its tables or name (`Kind::Autofill`, as `Web Data`).
 
 ### Form history interpretation

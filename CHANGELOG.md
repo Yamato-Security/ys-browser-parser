@@ -22,6 +22,9 @@ b2a6f96), sootmark-sqlite 0.2.0 (Sootmark/sqlite a42d881) and sootmark-plist 0.1
   visits. (#9) (@YamatoSecurity)
 
 ### Fixed
+- WebCache download decoding rejects out-of-bounds headers and unrecognized URL/path layouts
+  instead of presenting their bytes as download metadata; the entry's own URL and access time
+  remain available with a diagnostic. (@YamatoSecurity)
 - Form-history recovery keeps tombstone-confirmed deleted Firefox GUIDs separate when a value
   is entered again, and does not mislabel an older value of a live GUID as deleted. GUID-only
   renames and records with missing GUIDs retain conservative field/value matching. (@YamatoSecurity)

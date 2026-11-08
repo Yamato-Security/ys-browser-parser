@@ -19,7 +19,7 @@ out, as ESE leaves them out.
 
 Downloads are decoded here independently of the crate, from what their `ResponseHeaders`
 records were seen to hold: the start (a FILETIME at 0x24) and size (a u64 at 0x48) when the
-header (its size the record's first u32) is at least 0x50 bytes, and the NUL-terminated
+header (its size the record's first u32) is at least 0x50 bytes and fits the record, and the NUL-terminated
 UTF-16 strings that end the record: the target path, the URL, the path written while
 downloading (when it is a path), then the MIME type, the referrer and a publisher.
 
@@ -124,9 +124,13 @@ def trailing_strings(data):
 
 
 def is_path(value):
-    return value.startswith("\\\\") or (
-        len(value) > 2 and value[0].isascii() and value[0].isalpha() and value[1:3] == ":\\"
+    return value.startswith(("\\\\", "//")) or (
+        len(value) > 2 and value[0].isascii() and value[0].isalpha() and value[1:3] in (":\\", ":/")
     )
+
+
+def is_uri(value):
+    return bool(re.match(r"^[A-Za-z][A-Za-z0-9+.\-]*:.+$", value)) and not is_path(value)
 
 
 def line(*values):
@@ -157,13 +161,13 @@ def read(name, data):
             elif cname == "iedownload":
                 record = get("ResponseHeaders") or b""
                 header = struct.unpack_from("<I", record, 0)[0] if len(record) >= 4 else 0
-                numbers = header >= 0x50 and len(record) >= 0x50
+                numbers = 0x50 <= header <= len(record)
                 accessed = filetime(get("AccessedTime"))
                 start = filetime(struct.unpack_from("<Q", record, 0x24)[0]) if numbers else None
                 size = struct.unpack_from("<Q", record, 0x48)[0] if numbers else None
-                strings = trailing_strings(record[min(header, len(record)):])
+                strings = trailing_strings(record[header:]) if numbers else []
                 target = current = mime = referrer = publisher = None
-                if len(strings) < 2:
+                if len(strings) < 2 or not is_path(strings[-1]) or not is_uri(strings[-2]):
                     target, source = "", url
                 else:
                     target, source = strings.pop(), strings.pop()
