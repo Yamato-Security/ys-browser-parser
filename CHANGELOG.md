@@ -14,19 +14,17 @@ b2a6f96), sootmark-sqlite 0.2.0 (Sootmark/sqlite a42d881) and sootmark-plist 0.1
   (`RecoveredFormEntry`, with their provenance) and Firefox's removals (`FormRemoval`). (#2)
   (@YamatoSecurity)
 - Internet Explorer and legacy Edge's `WebCacheV01.dat` read whole: `read_webcache` gives its
-  containers, the entries of its history containers (each visit with its modified, expiry and
-  sync times; `ModifiedTime` local in a day's or a week's container, preserving special FILETIME
-  values), the downloads of its
-  `iedownload` containers (URL, saved and partial paths, size, start, referrer, MIME type,
-  publisher), the
-  entries of the others (cached files with their path and HTTP headers, cookie files, web
-  storage, compatibility lists, …) and the cookies of its `CookieEntryEx` tables (Windows 10 and
-  later) with whose they are (`PartitionsEx`). A download whose header is smaller than `0x50`
-  bytes or extends beyond its record falls back to the entry's URL and access time, with no
-  size, paths or other trailing-string fields. If only the trailing URL/path validation fails,
-  the entry's URL is used but the decoded start time and size are retained. Both cases produce
-  a diagnostic. `read` gives a WebCache's downloads with its visits. (#9)
-  (@YamatoSecurity)
+  containers, the entries of its history containers (each visit with its modified, expiry and sync
+  times; `ModifiedTime` local in a day's or a week's container, preserving special FILETIME
+  values), the downloads of its `iedownload` containers (URL, saved and partial paths, size, start,
+  referrer, MIME type, publisher), the entries of the others (cached files with their path and HTTP
+  headers, cookie files, web storage, compatibility lists, …) and the cookies of its
+  `CookieEntryEx` tables (Windows 10 and later) with whose they are (`PartitionsEx`). A download
+  whose header is smaller than `0x50` bytes or extends beyond its record falls back to the entry's
+  URL and access time, with no size, paths or other trailing-string fields. If only the trailing
+  URL/path validation fails, the entry's URL is used but the decoded start time and size are
+  retained. Both cases produce a diagnostic. `read` gives a WebCache's downloads with its visits.
+  (#9) (@YamatoSecurity)
 
 ### Fixed
 - Form-history recovery keeps tombstone-confirmed deleted Firefox GUIDs separate when a value
