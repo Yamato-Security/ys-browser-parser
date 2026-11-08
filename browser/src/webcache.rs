@@ -59,9 +59,10 @@ const TABLELESS: [&str; 3] = [
 pub struct WebCache {
     /// The caches its `Containers` table lists, in its order.
     pub containers: Vec<WebCacheContainer>,
-    /// The visits of its history containers, container by container (as
-    /// [`read`](crate::read) gives them).
-    pub visits: Vec<Visit>,
+    /// The entries of its history containers, container by container: each
+    /// a visit (as [`read`](crate::read) gives them) with the entry's other
+    /// times.
+    pub visits: Vec<WebCacheVisit>,
     /// The downloads of its `iedownload` containers.
     pub downloads: Vec<WebCacheDownload>,
     /// The entries of every other container (cached files, cookie files, web
@@ -71,6 +72,35 @@ pub struct WebCache {
     pub cookies: Vec<WebCacheCookie>,
     /// Damage in the database, and rows that couldn't be read.
     pub problems: Vec<String>,
+}
+
+/// An entry of a history container (`History`, `MSHist01…`): a URL visited.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebCacheVisit {
+    /// The visit, as [`read`](crate::read) gives it: its `id` the entry's
+    /// `EntryId`, its `table` its container's table, its `time`
+    /// `AccessedTime` (the last visit), its `visit_count` `AccessCount`, its
+    /// `user` the account of the URL (`Visited: alice@…`).
+    pub visit: Visit,
+    /// Its container's `ContainerId`.
+    pub container: i64,
+    /// `CreationTime`.
+    pub created: Option<Ts>,
+    /// `ModifiedTime`. In a day's or a week's container (`MSHist01…`) it is
+    /// a local time, the wall clock of the system's time zone
+    /// ([`Semantic::LocalUnknownZone`](common::time::Semantic::LocalUnknownZone));
+    /// in `History`, UTC.
+    pub modified: Option<Ts>,
+    /// `ExpiryTime`: when the entry leaves the history.
+    pub expires: Option<Ts>,
+    /// `SyncTime`.
+    pub synced: Option<Ts>,
+    /// `SyncCount`.
+    pub sync_count: Option<i64>,
+    /// `Type`, as stored.
+    pub entry_type: Option<i64>,
+    /// `Flags`, as stored.
+    pub flags: Option<i64>,
 }
 
 /// A cache: a row of the `Containers` table.
@@ -210,7 +240,10 @@ pub(crate) fn read(db: &Database<'_>, mut problems: Vec<String>) -> WebCache {
             continue;
         };
         if is_history(&container.name) {
-            visits.extend(rows.by_ref().filter_map(|row| visit(table, &row)));
+            visits.extend(
+                rows.by_ref()
+                    .filter_map(|row| visit(container, table, &row)),
+            );
         } else if container.name == "iedownload" {
             for row in rows.by_ref() {
                 downloads.push(download(container, table, &row, &mut problems));
@@ -270,14 +303,15 @@ fn secure_directories(names: &str) -> Vec<String> {
         .collect()
 }
 
-fn visit(table: &Table, row: &Row) -> Option<Visit> {
+fn visit(container: &WebCacheContainer, table: &Table, row: &Row) -> Option<WebCacheVisit> {
     let get = |name: &str| row.get(table, name);
     let integer = |name: &str| get(name).and_then(Value::as_i64);
     let (user, url) = split_url(get("Url").and_then(Value::as_text)?);
     let time = integer("AccessedTime")
         .and_then(|ticks| u64::try_from(ticks).ok())
         .map(Ts::from_filetime);
-    Some(Visit {
+    let modified = filetime(get("ModifiedTime"));
+    let visit = Visit {
         id: integer("EntryId").unwrap_or_default(),
         table: table.name.clone(),
         time,
@@ -292,7 +326,27 @@ fn visit(table: &Table, row: &Row) -> Option<Visit> {
         typed_count: None,
         hidden: false,
         frecency: None,
+    };
+    Some(WebCacheVisit {
+        visit,
+        container: container.id,
+        created: filetime(get("CreationTime")),
+        modified: if container.name.starts_with("MSHist") {
+            modified.and_then(local)
+        } else {
+            modified
+        },
+        expires: filetime(get("ExpiryTime")),
+        synced: filetime(get("SyncTime")),
+        sync_count: integer("SyncCount"),
+        entry_type: integer("Type"),
+        flags: integer("Flags"),
     })
+}
+
+/// A time read as UTC that is the wall clock of an unknown zone.
+fn local(time: Ts) -> Option<Ts> {
+    Some(Ts::from_local_ticks(time.ticks()?, time.precision()))
 }
 
 fn entry(container: &WebCacheContainer, table: &Table, row: &Row) -> WebCacheEntry {

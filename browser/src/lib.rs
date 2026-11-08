@@ -94,7 +94,9 @@ pub use opera::{TypedEntry, TypedUrl};
 
 pub use sqlite::{Area, Confidence, Evidence, PageState};
 pub use transition::{CoreTransition, PageTransition, Qualifier, Transition, VisitType};
-pub use webcache::{WebCache, WebCacheContainer, WebCacheCookie, WebCacheDownload, WebCacheEntry};
+pub use webcache::{
+    WebCache, WebCacheContainer, WebCacheCookie, WebCacheDownload, WebCacheEntry, WebCacheVisit,
+};
 
 /// This crate's version, for records of what parsed them.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -797,7 +799,8 @@ fn is_ese(data: &[u8]) -> bool {
 }
 
 /// Read Internet Explorer and legacy Edge's `WebCacheV01.dat` whole: its
-/// containers, the visits of its history containers, the downloads of its
+/// containers, the entries of its history containers (the visits, with
+/// their other times), the downloads of its
 /// `iedownload` containers, the entries of the others (cached files, cookie
 /// files, web storage, …) and the cookies of its `CookieEntryEx` tables.
 ///
@@ -815,7 +818,8 @@ pub fn read_webcache(data: &[u8]) -> Result<WebCache, Error> {
 /// A WebCache's visits and downloads, as history.
 fn webcache_history(data: &[u8]) -> Result<History, Error> {
     let cache = read_webcache(data)?;
-    let mut history = History::of_visits(Kind::WebCache, cache.visits, cache.problems);
+    let visits = cache.visits.into_iter().map(|v| v.visit).collect();
+    let mut history = History::of_visits(Kind::WebCache, visits, cache.problems);
     history.downloads = cache.downloads.into_iter().map(|d| d.download).collect();
     Ok(history)
 }

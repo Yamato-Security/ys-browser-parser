@@ -67,7 +67,8 @@ fn lines(file: &str, cache: &WebCache) -> Vec<String> {
             time(c.last_scavenge),
         ]);
     }
-    for v in &cache.visits {
+    for h in &cache.visits {
+        let v = &h.visit;
         line(vec![
             "visit".into(),
             v.table.clone(),
@@ -75,6 +76,13 @@ fn lines(file: &str, cache: &WebCache) -> Vec<String> {
             opt(v.user.as_deref()),
             escape(&v.url),
             time(v.time),
+            time(h.created),
+            time(h.modified),
+            time(h.expires),
+            time(h.synced),
+            opt(h.sync_count),
+            opt(h.entry_type),
+            opt(h.flags),
         ]);
     }
     for d in &cache.downloads {
@@ -320,4 +328,39 @@ fn entries_and_cookies() {
         "{:?}",
         edge.directory
     );
+}
+
+/// The history entries' times beside the visit: UTC in `History`, and in a day's container the
+/// local time of the system (UTC+2) for `ModifiedTime`.
+#[test]
+fn history_times() {
+    use common::time::Semantic;
+    let cache = webcache(FILES[0]);
+    let find = |container: i64, id: i64| {
+        cache
+            .visits
+            .iter()
+            .find(|v| v.container == container && v.visit.id == id)
+            .unwrap()
+    };
+    let main = find(2, 25);
+    assert_eq!(main.visit.url, "https://www.google.nl/search?hl=nl&q=plaso");
+    assert_eq!(main.visit.table, "Container_2");
+    assert_eq!(time(main.visit.time), "2014-05-12T07:30:37.0769883Z");
+    assert_eq!(time(main.modified), "2014-05-12T07:30:37.0145272Z");
+    assert_eq!(time(main.expires), "2014-06-07T07:30:37.0150502Z");
+    assert_eq!(time(main.synced), "2014-05-12T07:30:37.0769883Z");
+    assert_eq!(main.created, None);
+    assert_eq!(main.entry_type, Some(0x20_0001));
+    let day = find(23, 1);
+    assert_eq!(day.visit.url, "http://plaso.kiddaland.net/");
+    assert_eq!(time(day.visit.time), "2014-05-12T07:30:41.6865620Z");
+    assert_eq!(day.modified.unwrap().semantic(), Semantic::LocalUnknownZone);
+    assert_eq!(time(day.modified), "2014-05-12T09:30:41.6860000");
+    assert_eq!(time(day.expires), "2014-06-07T07:30:41.6870850Z");
+    assert_eq!((day.entry_type, day.flags), (Some(0x20_0004), Some(4)));
+    // read() gives the same visits
+    let history = read(&support::fixture("plaso/WebCacheV01.dat.gz"), &[]).unwrap();
+    let visits: Vec<_> = cache.visits.iter().map(|v| v.visit.clone()).collect();
+    assert_eq!(history.visits, visits);
 }

@@ -3,7 +3,8 @@
 One line per row, by kind (the first two columns are the file, as given, and the kind):
 
     container  id, name, directory, secure directories (joined with |), last access, last scavenge
-    visit      table, id, account, url, time (AccessedTime)
+    visit      table, id, account, url, time (AccessedTime), created, modified, expires, synced,
+               sync count, type, flags
     download   container, id, url, target path, current path, start, size, referrer,
                MIME type, publisher, AccessedTime
     entry      container, its name, id, url, account, file name, file path, file size, type,
@@ -13,7 +14,8 @@ One line per row, by kind (the first two columns are the file, as given, and the
                last modified, flags
 
 Times are FILETIMEs written as UTC, `YYYY-MM-DDTHH:MM:SS.fffffffZ`; zero is empty, as are
-missing values. Backslashes, tabs, carriage returns and line feeds in text are written as
+missing values. The `ModifiedTime` of a day's or a week's history container (`MSHist01…`) is the
+system's local time: it is written without the `Z`. Backslashes, tabs, carriage returns and line feeds in text are written as
 \\\\, \\t, \\r and \\n. Records flagged deleted on their page (not yet cleaned up) are left
 out, as ESE leaves them out.
 
@@ -157,7 +159,12 @@ def read(name, data):
                 if not url:
                     continue
                 user, url = split_url(url)
-                line(name, "visit", table, get("EntryId"), user, url, filetime(get("AccessedTime")))
+                modified = filetime(get("ModifiedTime"))
+                if modified and cname.startswith("MSHist"):
+                    modified = modified[:-1]
+                line(name, "visit", table, get("EntryId"), user, url, filetime(get("AccessedTime")),
+                     filetime(get("CreationTime")), modified, filetime(get("ExpiryTime")),
+                     filetime(get("SyncTime")), get("SyncCount"), get("Type"), get("Flags"))
             elif cname == "iedownload":
                 record = get("ResponseHeaders") or b""
                 header = struct.unpack_from("<I", record, 0)[0] if len(record) >= 4 else 0
