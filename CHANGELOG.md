@@ -14,8 +14,9 @@ b2a6f96), sootmark-sqlite 0.2.0 (Sootmark/sqlite a42d881) and sootmark-plist 0.1
   (`RecoveredFormEntry`, with their provenance) and Firefox's removals (`FormRemoval`). (#2)
   (@YamatoSecurity)
 - Internet Explorer and legacy Edge's `WebCacheV01.dat` read whole: `read_webcache` gives its
-  containers, the entries of its history containers (each visit with its modified, expiry and sync
-  times; `ModifiedTime` local in a day's or a week's container, preserving special FILETIME
+  containers, the entries of its history containers (each visit with the page's title and its
+  modified, expiry and sync times; titles require complete property stores and NUL-terminated
+  UTF-16; `ModifiedTime` local in a day's or a week's container, preserving special FILETIME
   values), the downloads of its `iedownload` containers (URL, saved and partial paths, size, start,
   referrer, MIME type, publisher), the entries of the others (cached files with their path and HTTP
   headers, cookie files, web storage, compatibility lists, …) and the cookies of its
