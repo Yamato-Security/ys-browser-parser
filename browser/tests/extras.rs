@@ -102,10 +102,7 @@ fn chromium_rows(got: &mut BTreeSet<String>) {
             action.rowid,
             action.extension_id,
             action.api_name.as_deref().unwrap_or_default(),
-            action
-                .action_type
-                .map(|a| a.to_string())
-                .unwrap_or_default(),
+            action.action_type.map_or_default(|a| a.to_string()),
             micros(action.time.unwrap())
         ));
     }
@@ -147,7 +144,7 @@ fn safari_rows(got: &mut BTreeSet<String>) {
                 "{name}\tvisit\t{}\t{}\t{}\t{}",
                 visit.url,
                 visit.title,
-                visit.visit_count.map(|c| c.to_string()).unwrap_or_default(),
+                visit.visit_count.map_or_default(|c| c.to_string()),
                 micros(visit.time.unwrap())
             ));
         }

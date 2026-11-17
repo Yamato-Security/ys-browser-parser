@@ -10,7 +10,6 @@ rust-version = "1.99"
 description = "Reader of Apple property lists for forensics: binary (bplist00) and XML, every object type, NSKeyedArchiver archives resolved, damage reported rather than fatal."
 license = "RPL-1.5 AND (MIT OR Apache-2.0)"
 repository = "https://github.com/Yamato-Security/ys-browser-parser"
-homepage = "https://github.com/Yamato-Security/ys-browser-parser"
 keywords = ["forensics", "dfir", "incident-response", "plist", "macos"]
 # Sources only: test fixtures stay in the repository.
 include = ["/src", "/README.md", "/LICENSE", "/LICENSE-APACHE", "/LICENSE-MIT"]
@@ -23,7 +22,7 @@ name = "plist"
 common = { package = "sootmark-common", version = "0.3.7" }
 
 [dev-dependencies]
-proptest = "1"
+proptest = "1.12.0"
 
 [lints.rust]
 unsafe_code = "forbid"

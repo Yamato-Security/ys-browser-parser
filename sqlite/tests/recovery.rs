@@ -506,10 +506,7 @@ fn live_rows_are_never_reported() {
         let recovered = db.recover();
         for record in &recovered.records {
             let table = record.table.as_deref().unwrap_or_default();
-            let live = db
-                .rows(table)
-                .map(Iterator::collect::<Vec<_>>)
-                .unwrap_or_default();
+            let live = db.rows(table).map_or_default(Iterator::collect::<Vec<_>>);
             let is_live =
                 live.iter().any(|row| {
                     record.rowid.is_none_or(|rowid| rowid == row.rowid)

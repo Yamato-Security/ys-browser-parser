@@ -168,8 +168,7 @@ pub fn read_preferences(data: &[u8]) -> Result<Preferences, Error> {
     };
     let settings = extensions
         .and_then(|e| e.get("settings"))
-        .map(members)
-        .unwrap_or_default();
+        .map_or_default(members);
     let extensions_installed = settings
         .iter()
         .map(|(id, settings)| {
@@ -205,8 +204,7 @@ pub fn read_preferences(data: &[u8]) -> Result<Preferences, Error> {
         .get("profile")
         .and_then(|p| p.get("content_settings"))
         .and_then(|c| c.get("exceptions"))
-        .map(members)
-        .unwrap_or_default();
+        .map_or_default(members);
     let mut content_exceptions = Vec::new();
     for (permission, sites) in exceptions {
         for (pattern, setting) in members(sites) {

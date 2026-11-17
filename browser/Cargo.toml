@@ -10,7 +10,6 @@ rust-version = "1.99"
 description = "Browser artifacts for forensics: history and downloads (Chromium, Firefox, Safari, Opera, Internet Explorer WebCache) with deleted entries recovered, cookies (Safari's binary ones too) with Google Analytics decoded, Chromium and Firefox disk caches, form history, extensions, Edge load statistics, Java cache index files."
 license = "RPL-1.5 AND (MIT OR Apache-2.0)"
 repository = "https://github.com/Yamato-Security/ys-browser-parser"
-homepage = "https://github.com/Yamato-Security/ys-browser-parser"
 keywords = ["forensics", "dfir", "incident-response", "chrome", "firefox"]
 # Sources only: test fixtures stay in the repository.
 include = ["/src", "/README.md", "/LICENSE", "/LICENSE-APACHE", "/LICENSE-MIT"]
@@ -26,7 +25,7 @@ plist = { package = "ys-browser-parser-plist", path = "../plist", version = "1.0
 sqlite = { package = "ys-browser-parser-sqlite", path = "../sqlite", version = "1.0" }
 
 [dev-dependencies]
-proptest = "1"
+proptest = "1.12.0"
 
 [lints.rust]
 unsafe_code = "forbid"
