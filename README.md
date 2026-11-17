@@ -99,6 +99,16 @@ What the fork changes:
 | Safari binary-cookie page checksums wrap correctly for large pages instead of panicking | fork |
 | SQLite hardening: rejected WAL headers cannot affect the file fallback, damaged values stay NULL, and image exports cannot expand tiny logs into huge allocations | fork |
 
+## Contributing
+
+Contributions require this repository's [Contributor License Agreement](CLA.md).
+It permits **Zachary Mathis** and **Shirofune Security Co., Ltd.** to use and
+sell covered contributions in proprietary editions, while accepted contributions
+also remain available in the free, open-source community edition.
+Read [how to sign](CONTRIBUTING.md#how-to-sign). The `cla/required` check uses
+the [maintainer-verified signer registry](.github/cla/signatures.json); first-time
+signatures require verification and registration.
+
 ## Licence
 
 ys-browser-parser is copyright Shirofune Security Co., Ltd. and released under the [Reciprocal
