@@ -39,7 +39,7 @@ fn fixture(name: &str) -> Vec<u8> {
 }
 
 fn history(database: &str, wal: Option<&str>) -> History {
-    let wal = wal.map(fixture).unwrap_or_default();
+    let wal = wal.map_or_default(fixture);
     let history = read(&fixture(database), &wal).unwrap();
     assert!(
         history.problems.is_empty(),

@@ -293,8 +293,7 @@ fn containers(db: &Database<'_>, problems: &mut Vec<String>) -> Vec<WebCacheCont
                 directory: text(get("Directory")),
                 partition: text(get("PartitionId")),
                 secure_directories: text(get("SecureDirectories"))
-                    .map(|names| secure_directories(&names))
-                    .unwrap_or_default(),
+                    .map_or_default(|names| secure_directories(&names)),
                 last_access: filetime(get("LastAccessTime")),
                 last_scavenge: filetime(get("LastScavengeTime")),
             })
@@ -722,8 +721,7 @@ fn cookies(db: &Database<'_>, problems: &mut Vec<String>) -> Vec<WebCacheCookie>
                 directory: directory.clone(),
                 id: get("EntryId").and_then(Value::as_i64).unwrap_or_default(),
                 host: text(get("RDomain"))
-                    .map(|domain| domain.split('.').rev().collect::<Vec<_>>().join("."))
-                    .unwrap_or_default(),
+                    .map_or_default(|domain| domain.split('.').rev().collect::<Vec<_>>().join(".")),
                 path: text(get("Path")).unwrap_or_default(),
                 name: cookie_text(get("Name")),
                 value: cookie_text(get("Value")),

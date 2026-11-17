@@ -79,7 +79,7 @@ fn line(file: &str, data_type: &str, desc: &str, time: Option<Ts>, fields: &[Str
 }
 
 fn text(value: Option<impl ToString>) -> String {
-    value.map(|v| v.to_string()).unwrap_or_default()
+    value.map_or_default(|v| v.to_string())
 }
 
 fn load_statistics(lines: &mut Vec<String>) {
@@ -175,8 +175,7 @@ fn analytics_lines(file: &str, cookie: &Cookie, lines: &mut Vec<String>) {
         variables
             .iter()
             .find(|(k, _)| k == key)
-            .map(|(_, v)| v.clone())
-            .unwrap_or_default()
+            .map_or_default(|(_, v)| v.clone())
     };
     let (data_type, desc, times, fields) = match analytics {
         GoogleAnalytics::Utma {

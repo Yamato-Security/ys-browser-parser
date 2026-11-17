@@ -223,20 +223,17 @@ fn firefox_line(file: &str, entry: &FirefoxCacheEntry, lines: &mut Vec<String>) 
             "2".to_owned()
         },
         entry.fetch_count.to_string(),
-        entry.frecency.map(|f| f.to_string()).unwrap_or_default(),
+        entry.frecency.map_or_default(|f| f.to_string()),
         entry.request_method().unwrap_or_default().to_owned(),
         entry.response_status().unwrap_or_default().to_owned(),
         entry.key_size.to_string(),
-        entry
-            .elements_size
-            .map(|s| s.to_string())
-            .unwrap_or_default(),
+        entry.elements_size.map_or_default(|s| s.to_string()),
         if v1 {
             entry.data_size.to_string()
         } else {
             String::new()
         },
-        entry.location.map(|l| l.to_string()).unwrap_or_default(),
+        entry.location.map_or_default(|l| l.to_string()),
     ];
     for (desc, time) in [
         ("Last Visited Time", entry.last_fetched),
